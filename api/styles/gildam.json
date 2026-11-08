@@ -1,0 +1,15 @@
+{
+  "version": 8,
+  "name": "gildam-basic (stage 1 placeholder)",
+  "metadata": { "gildam:tiles": "앱이 manifest.tiles_url 로 sources.protomaps.url 을 pmtiles://<tiles_url> 로 바꿔 씀" },
+  "sources": { "protomaps": { "type": "vector", "url": "pmtiles://https://maps.nuni.co.kr/tiles/current/gildam.pmtiles", "attribution": "© OpenStreetMap contributors · © Protomaps" } },
+  "layers": [
+    { "id": "background", "type": "background", "paint": { "background-color": "#f4f2ec" } },
+    { "id": "earth", "type": "fill", "source": "protomaps", "source-layer": "earth", "paint": { "fill-color": "#f4f2ec" } },
+    { "id": "landuse-park", "type": "fill", "source": "protomaps", "source-layer": "landuse", "filter": ["in", ["get", "kind"], ["literal", ["park", "forest", "wood", "nature_reserve", "grass"]]], "paint": { "fill-color": "#d8e8cf" } },
+    { "id": "water", "type": "fill", "source": "protomaps", "source-layer": "water", "paint": { "fill-color": "#a9cfe3" } },
+    { "id": "roads-minor", "type": "line", "source": "protomaps", "source-layer": "roads", "filter": ["in", ["get", "kind"], ["literal", ["minor_road", "path", "other"]]], "paint": { "line-color": "#ffffff", "line-width": 1 } },
+    { "id": "roads-major", "type": "line", "source": "protomaps", "source-layer": "roads", "filter": ["in", ["get", "kind"], ["literal", ["major_road", "highway", "medium_road"]]], "paint": { "line-color": "#f2c98a", "line-width": 2 } },
+    { "id": "buildings", "type": "fill", "source": "protomaps", "source-layer": "buildings", "paint": { "fill-color": "#e3ded5" } }
+  ]
+}

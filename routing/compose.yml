@@ -1,0 +1,46 @@
+services:
+  engine:
+    image: eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474
+    container_name: gildam-routing-engine
+    user: "1000:1000"
+    command: ["java", "-Xms32m", "-Xmx256m", "-DmaxRunningTime=12", "-cp", "/app/brouter-1.7.10-all.jar", "btools.server.RouteServer", "/segments4", "/profiles2", "/tmp/customprofiles", "17777", "1", "0.0.0.0"]
+    volumes:
+      - ./brouter-1.7.10-all.jar:/app/brouter-1.7.10-all.jar:ro
+      - ./segments4:/segments4:ro
+      - ./profiles2:/profiles2:ro
+    networks: [routing]
+    mem_limit: 384m
+    cpus: 0.75
+    pids_limit: 64
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: none
+    restart: unless-stopped
+  api:
+    image: node:24.21.0-alpine
+    container_name: gildam-routing-api
+    user: "1000:1000"
+    command: ["node", "--max-old-space-size=48", "/app/routing-proxy.mjs"]
+    environment:
+      ENGINE: http://engine:17777
+      PORT: "17778"
+    volumes:
+      - ./routing-proxy.mjs:/app/routing-proxy.mjs:ro
+    networks: [routing, web]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 32
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: none
+    restart: unless-stopped
+networks:
+  routing:
+    internal: true
+  web:
+    external: true

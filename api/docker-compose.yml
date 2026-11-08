@@ -1,0 +1,70 @@
+# /srv/gildam-api — 길담 동기화 API + 지도 관리 (stage 1)
+#   www.nuni.co.kr/gildam-api/* → gildam-api:8080 (동기화 API)
+#   maps.nuni.co.kr: /v1/* /admin* → gildam-api:8080, 나머지(/tiles /styles /fonts /sprites) → gildam-tiles:8080
+name: gildam-api
+services:
+  gildam-api:
+    build: .
+    image: local/gildam-api:${APP_REV:-latest}
+    container_name: gildam-api
+    restart: unless-stopped
+    env_file: .env            # WORKER_TOKEN_SHA256 (해시만), mode 600
+    environment:
+      BASE_PATH: /gildam-api
+      OIDC_ISSUER: https://id.nuni.co.kr
+      JWKS_URL: https://id.nuni.co.kr/.well-known/jwks.json
+      OIDC_AUDIENCE: gildam-android
+      BRAND_ID: gildam
+      DB_PATH: /data/gildam.sqlite
+      MAPS_ROOT: /srv/gildam-maps
+      MAPS_PUBLIC_URL: https://maps.nuni.co.kr
+      ADMIN_CLIENT_ID: gildam-admin-web
+    group_add: ["982"]        # gildam-maps
+    volumes:
+      - ./data:/data
+      - /srv/gildam-maps:/srv/gildam-maps
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [web]
+    mem_limit: 128m
+    pids_limit: 64
+  gildam-tiles:
+    image: nginx:1-alpine
+    container_name: gildam-tiles
+    restart: unless-stopped
+    volumes:
+      - ./tiles/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web/public:/srv/gildam-web:ro
+      - /srv/gildam-maps:/srv/gildam-maps:ro
+    networks: [web]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  # 지도 생성 워커: generate 작업 → pmtiles extract → SHA256SUMS → 검증 요청 (게시는 관리자)
+  gildam-map-worker:
+    build: ./map-worker
+    image: local/gildam-map-worker:${APP_REV:-latest}
+    container_name: gildam-map-worker
+    restart: unless-stopped
+    env_file: map-worker.env  # GILDAM_WORKER_TOKEN (원문), mode 600, git 제외
+    environment:
+      GILDAM_API_URL: http://gildam-api:8080
+      WORKER_ID: ovh-map-worker
+      POLL_SEC: "30"
+    volumes:
+      - /srv/gildam-maps/incoming:/out   # 쓰기는 incoming 만
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [web]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 64
+networks:
+  web: { external: true }

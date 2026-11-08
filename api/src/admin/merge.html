@@ -1,0 +1,28 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>이어 붙이기·자르기 · 길담 관리</title>
+<link rel="stylesheet" href="/vendor/maplibre-gl.css?v=6"><link rel="stylesheet" href="/admin/tools.css?v=1"></head>
+<body>
+<header class="top"><span class="logo">길</span><b>길담 관리 · 코스 도구</b>
+<nav><a href="/admin/">지도 관리</a><a href="/admin/course">코스 만들기</a><a href="/admin/merge" class="on">이어 붙이기·자르기</a></nav></header>
+<main>
+<aside class="side">
+  <h2>코스 이어 붙이기·자르기</h2>
+  <label class="drop" id="drop"><input type="file" id="files" accept=".gpx" multiple hidden>⬆ <b>GPX 여러 개를 끌어다 놓거나 눌러서 선택</b><br><small>🔒 브라우저 안에서만 처리 · 서버로 보내지 않아요</small></label>
+  <div class="list" id="list"></div>
+  <div class="row"><span>합치는 방식</span><div class="seg" id="mode" style="flex:1"><button data-v="one" class="on">하나의 구간(trkseg)</button><button data-v="keep">구간 유지</button></div></div>
+  <div class="stats" id="st"></div>
+  <h3>자르기 — 시작·끝 고르기</h3>
+  <div class="seg" id="pick"><button data-v="start">🟢 시작점 고르기</button><button data-v="end">🟡 끝점 고르기</button><button data-v="reset">전체</button></div>
+  <p class="hint">버튼을 누른 뒤 <b>지도 위 경로</b>나 <b>아래 고도 그래프</b>를 누르세요.</p>
+  <div class="chart"><canvas id="ch" height="150"></canvas></div>
+  <h3>내보내기 (GPX 1.1)</h3>
+  <input id="nm" placeholder="코스 이름" maxlength="80" style="width:100%;padding:8px;border:1px solid var(--olv);border-radius:10px;font:inherit">
+  <label class="row"><input type="checkbox" id="wt"> 원본 시간 정보 남기기 (기본은 지움)</label>
+  <label class="row"><input type="checkbox" id="fill" checked> 고도 없는 점은 지형 데이터로 채우기</label>
+  <div class="btns"><button class="pri" id="exp">선택 구간 GPX 내보내기</button></div>
+</aside>
+<div class="mapwrap"><div id="map"></div></div>
+</main>
+<script src="/vendor/maplibre-gl.js?v=6"></script><script src="/vendor/pmtiles.js?v=6"></script>
+<script src="/admin/gpxlib.js?v=1"></script><script src="/admin/merge.js?v=1"></script>
+</body></html>

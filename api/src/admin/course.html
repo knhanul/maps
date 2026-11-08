@@ -1,0 +1,27 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>코스 만들기 · 길담 관리</title>
+<link rel="stylesheet" href="/vendor/maplibre-gl.css?v=6"><link rel="stylesheet" href="/admin/tools.css?v=1"></head>
+<body>
+<header class="top"><span class="logo">길</span><b>길담 관리 · 코스 도구</b>
+<nav><a href="/admin/">지도 관리</a><a href="/admin/course" class="on">코스 만들기</a><a href="/admin/merge">이어 붙이기·자르기</a></nav></header>
+<main>
+<aside class="side">
+  <h2>코스 만들기</h2>
+  <p class="hint">지도를 눌러 점 추가 · 점을 끌어 이동 · <b>점을 누르면(폰은 길게 누르면) 삭제</b>. 선은 직선으로 이어요 <span class="chip">길 따라 자동 연결은 준비 중</span></p>
+  <div class="stats" id="st"></div>
+  <div class="btns"><button id="undo">↶ 되돌리기</button><button id="redo">↷ 다시</button><button id="loop">⟲ 출발점으로</button><button id="rev">⇄ 방향 바꾸기</button><button id="clear">지우기</button></div>
+  <div class="chart"><canvas id="ch" height="150"></canvas></div>
+  <p class="hint" id="demHint">⛰ 표고는 길담 지형 데이터(Copernicus GLO-30 기반, 약 30m 해상도)에서 읽어요.</p>
+  <h3>내보내기 (GPX 1.1 · 길담 앱 「GPX 불러오기」 호환)</h3>
+  <input id="nm" placeholder="코스 이름" maxlength="80" style="width:100%;padding:8px;border:1px solid var(--olv);border-radius:10px;font:inherit">
+  <label class="row"><input type="checkbox" id="dense" checked> 20m 간격으로 점 채우기 (고도 그래프 보존)</label>
+  <label class="row"><input type="checkbox" id="wt"> 시간 정보 넣기 (예상 속도 기준) — 기본은 꺼짐</label>
+  <div class="seg" id="spd"><button data-v="3" class="on">등산 3km/h</button><button data-v="4">걷기 4km/h</button><button data-v="15">자전거 15km/h</button></div>
+  <div class="btns"><button class="pri" id="exp">GPX 내보내기</button><label class="btn">GPX로 시작<input type="file" id="imp" accept=".gpx" hidden></label></div>
+  <p class="hint">🔒 GPX는 이 브라우저 안에서만 만들고 읽어요. 서버로 보내거나 저장하지 않아요.</p>
+</aside>
+<div class="mapwrap"><div id="map"></div></div>
+</main>
+<script src="/vendor/maplibre-gl.js?v=6"></script><script src="/vendor/pmtiles.js?v=6"></script>
+<script src="/admin/gpxlib.js?v=1"></script><script src="/admin/course.js?v=1"></script>
+</body></html>

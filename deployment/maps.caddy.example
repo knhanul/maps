@@ -1,0 +1,22 @@
+# /srv/caddy/conf/pending/gildam-maps.caddy — 길담 지도 (maps.nuni.co.kr)
+# ⚠️ DNS A maps.nuni.co.kr → YOUR_SERVER_IP 가 8.8.8.8/1.1.1.1 에서 보인 "뒤"에만 Caddyfile 에 import 를 추가 (인증서 발급 실패·rate limit 방지)
+# encode 를 쓰지 않음: PMTiles Range 응답을 압축하면 안 됨
+maps.nuni.co.kr {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+	@app path /v1/* /admin /admin/* /healthz
+	handle @app {
+		reverse_proxy gildam-api:8080
+	}
+	handle {
+		reverse_proxy gildam-tiles:8080
+	}
+}

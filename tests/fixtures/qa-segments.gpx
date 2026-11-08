@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Gildam QA synthetic fixture" xmlns="http://www.topografix.com/GPX/1/1" xmlns:qa="urn:gildam-qa">
+<metadata><name>QA 테스트 - 실제 이동 기록 아님</name></metadata>
+<trk><name>서울·제주 분리 구간 테스트</name>
+<trkseg><trkpt lon="126.977" lat="37.5665"><ele>40</ele><time>2026-11-08T00:00:00Z</time><extensions><qa:note>untouched-original</qa:note></extensions></trkpt><trkpt lon="126.979" lat="37.567"><ele>42</ele><time>2026-11-08T00:01:00Z</time></trkpt><trkpt lon="126.982" lat="37.569"><ele>43</ele></trkpt><trkpt lon="126.987" lat="37.57"><ele>41</ele></trkpt></trkseg>
+<trkseg><trkpt lon="126.521" lat="33.510"/><trkpt lon="126.531" lat="33.510"/></trkseg>
+</trk></gpx>

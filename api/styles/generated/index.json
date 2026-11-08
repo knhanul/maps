@@ -1,0 +1,30 @@
+{
+ "default": "light",
+ "items": [
+  {
+   "id": "light",
+   "name": "기본",
+   "url": "https://maps.nuni.co.kr/styles/light.json"
+  },
+  {
+   "id": "dark",
+   "name": "야간",
+   "url": "https://maps.nuni.co.kr/styles/dark.json"
+  },
+  {
+   "id": "grayscale",
+   "name": "흑백",
+   "url": "https://maps.nuni.co.kr/styles/grayscale.json"
+  },
+  {
+   "id": "outdoor",
+   "name": "등산",
+   "url": "https://maps.nuni.co.kr/styles/outdoor.json"
+  },
+  {
+   "id": "gildam",
+   "name": "길담",
+   "url": "https://maps.nuni.co.kr/styles/gildam.json"
+  }
+ ]
+}

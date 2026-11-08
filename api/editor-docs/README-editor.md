@@ -1,0 +1,21 @@
+# Unified web course editor — v9-editor3 (2026-11-08 KST)
+
+Public menu 코스 편집, choices 새 코스 만들기 / GPX 불러와 수정하기. Same map, walk/hike/bicycle profiles, course name, undo, local save, GPX export. Existing new-course routing, five styles, terrain, POI module and disabled TourAPI status preserved.
+
+Imported GPX is processed ONLY in browser DOM/arrays. No document/trace/point list upload. Full input points are retained (no simplification to 100 waypoints). Multiple trkseg/rte containers, different tracks, and gaps remain separate LineString features; distance sums within segments only. Waypoints and metadata are kept in the immutable source XML, not editable in this UI.
+
+Workflow: choose segment dropdown; choose start/end point numbers or map buttons, zoom and click near actual points. Drag A, move A to a clicked position, add after A by map click, delete A, or trim selected source segment to the selected range. Other segments remain untouched. Undo up to 20 structural snapshots; unmodified point records are shared, not deep-copied per edit.
+
+Selected-section routing: select same-segment range, choose walk/hike/bicycle, click preview; explicit confirmation sends ONLY two anchor coordinates and mode to OWN /routing/route. No full GPX or intermediate trace points. Max direct anchor spacing 30km (existing API). Orange preview doesn't change document. Must Apply or Cancel before saving/exporting. Failures keep old model unchanged and block save/export until canceled. Request version/AbortController ignores stale route responses. Changing profile/selection cancels stale preview.
+
+Conservative route apply: preserve original boundary anchors, replace only interior selected path with a NEW separate segment between retained prefix/suffix segments. Even snapped coordinates slightly off the original anchors are NEVER joined by invented straight links. This can create additional trkseg/rte containers/gaps; inspect preview. Does not promise a seamless snapped connection. Untouched original nodes outside selected interior are preserved exactly semantically, including original time/extensions.
+
+Moved/inserted/routed points contain only new coordinates: no copied old timestamp/elevation/extensions. Elevation profile uses terrain data for the currently selected segment and is not written as fake original elevation. Optional export checkbox strips all time elements (default OFF, preserving original untouched timestamps). Edited export removes stale bounds. XML DOM serialization escapes values, rejects DTD/entities/malformed coords, removes root processing instructions and emits one XML declaration. Original source text/file unchanged. Filename *_수정본.gpx. Original XML retained with saved editable model; localStorage quota failure is explicit and current in-memory edits remain available for export.
+
+Limits: input 30MB, 200k points, 1000 source segments; edited max 250k points/1000 segments. No GPX autosave; explicit browser save supports reopen through existing saved list. beforeunload warns on unsaved geometry/preview. Switching new/import/open prompts before replacing current content. A newly imported comparison record can transfer its original XML to editor in the same session; legacy comparison records without XML explicitly warn before using only their old point list.
+
+Files: web/public/gpx-model.js, gpx-editor.js, editor.css; app.js bridge, import/save/tab hooks; index.html UI/load order. places.js and backend/routing configs untouched. Non-Git deployment. Working/test files /workspace/maps-editor.
+
+Tests: 10k dense points, multiple segments/gaps, source/time/extensions unchanged, move/insert/delete/trim, route split/undo/export, local save/reopen, malformed file keeps current state, 2-anchor-only outgoing payload, pending/failure block, stale suppression; existing new-route UI, POI five-style/toggle and API regressions. Browser rendering QA is a separate final check by parent.
+
+Rollback: restore dated backup app.js/index.html; new unused model/editor/css files may remain without being loaded. No service restart or backend changes are needed. Clear/reload browser page to restore old script version. Never delete users' browser-local saved data during rollback.

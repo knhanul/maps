@@ -1,0 +1,312 @@
+{
+  "version": "v10-gapfix1",
+  "source": "read-only production snapshot",
+  "files": [
+    {
+      "path": "api/package.json",
+      "serverSha256": "78b88f635dddb70354e8c7fe9f01a6c983a7ede2dfbd441b1e84755ab738f931",
+      "exportSha256": "78b88f635dddb70354e8c7fe9f01a6c983a7ede2dfbd441b1e84755ab738f931",
+      "modified": false
+    },
+    {
+      "path": "api/Dockerfile",
+      "serverSha256": "c3dbacdd2dcd82425027bd30d31c322bbe9587649a5b21dcaa3779190a33c1aa",
+      "exportSha256": "c3dbacdd2dcd82425027bd30d31c322bbe9587649a5b21dcaa3779190a33c1aa",
+      "modified": false
+    },
+    {
+      "path": "api/docker-compose.yml",
+      "serverSha256": "b625028ebaee944e3f8c48520c2e237f9f42c37e9a8c01caec6be835964c1b01",
+      "exportSha256": "b625028ebaee944e3f8c48520c2e237f9f42c37e9a8c01caec6be835964c1b01",
+      "modified": false
+    },
+    {
+      "path": "api/README.md",
+      "serverSha256": "18180718a4cbc2e537c0ec29227a24ce4f31b80bb44cc6ef1dc85e6351c20d41",
+      "exportSha256": "6efd9805ba81d91a37e5a16e575b747e35e608826f0247590ae8e94b77c9e612",
+      "modified": true
+    },
+    {
+      "path": "api/src/maps.mjs",
+      "serverSha256": "00336c3ccca8432208bfce099546fdcb03b9d602636f159fa1f108bb81f71a41",
+      "exportSha256": "00336c3ccca8432208bfce099546fdcb03b9d602636f159fa1f108bb81f71a41",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/merge.js",
+      "serverSha256": "8394c558796fb74cbec7c6f163bf693e3535c7e136735c9f8a3699e7bf56b755",
+      "exportSha256": "8394c558796fb74cbec7c6f163bf693e3535c7e136735c9f8a3699e7bf56b755",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/merge.html",
+      "serverSha256": "d3f0d067e5a672cc0130d9807ed750fca0c8b213d93c76c3644a983c5f4f8cda",
+      "exportSha256": "d3f0d067e5a672cc0130d9807ed750fca0c8b213d93c76c3644a983c5f4f8cda",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/gpxlib.js",
+      "serverSha256": "ed217558cfcaade780e5a5ebdb357b85ff7ec5622a2c97173a6e3dada23e0de5",
+      "exportSha256": "ed217558cfcaade780e5a5ebdb357b85ff7ec5622a2c97173a6e3dada23e0de5",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/course.html",
+      "serverSha256": "47bd8783ff848884da349b6c150df0490afde9fee274c2f3bb44ce83943423a4",
+      "exportSha256": "47bd8783ff848884da349b6c150df0490afde9fee274c2f3bb44ce83943423a4",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/admin.js",
+      "serverSha256": "d5bcd7b9260f3dfa85120cad651123cc4efb87f9f624d97a62450b6c199118c4",
+      "exportSha256": "c8d5d5768f1432dc396a2454aab370cd0a8b121f5fdba560480dc2fd0b91d4e6",
+      "modified": true
+    },
+    {
+      "path": "api/src/admin/tools.css",
+      "serverSha256": "e5e53adee1ba958cbaaf00a61e8181dcbd97d9c276c7ce2fac48b7c1664e82c6",
+      "exportSha256": "e5e53adee1ba958cbaaf00a61e8181dcbd97d9c276c7ce2fac48b7c1664e82c6",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/course.js",
+      "serverSha256": "2d1a42bd6652d8926ab71503be65aabdb53f3ccb6f6c9abfe9f0435296e71dff",
+      "exportSha256": "2d1a42bd6652d8926ab71503be65aabdb53f3ccb6f6c9abfe9f0435296e71dff",
+      "modified": false
+    },
+    {
+      "path": "api/src/admin/admin.css",
+      "serverSha256": "e4c2ccdf85290f94556583d7019491ce270d7b36a7fd580e46b2c82782f4147d",
+      "exportSha256": "e4c2ccdf85290f94556583d7019491ce270d7b36a7fd580e46b2c82782f4147d",
+      "modified": false
+    },
+    {
+      "path": "api/src/server.mjs",
+      "serverSha256": "d73bd2db85e9fc0f69928756071c3c3a8f89b30c32a535ec2d589dbe7a293636",
+      "exportSha256": "d73bd2db85e9fc0f69928756071c3c3a8f89b30c32a535ec2d589dbe7a293636",
+      "modified": false
+    },
+    {
+      "path": "api/test/local-admin-tools/session.mjs",
+      "serverSha256": "614e70d8676bbe3b8ed4c9354b72010e12e1e41bf173a205f0a1d7d1b3df157e",
+      "exportSha256": "614e70d8676bbe3b8ed4c9354b72010e12e1e41bf173a205f0a1d7d1b3df157e",
+      "modified": false
+    },
+    {
+      "path": "api/test/local-admin-tools/playwright.mjs",
+      "serverSha256": "ad612480121238b410c123a981fc88216ffba9fed2b5d629b0cf53b1b3c65d63",
+      "exportSha256": "ad612480121238b410c123a981fc88216ffba9fed2b5d629b0cf53b1b3c65d63",
+      "modified": false
+    },
+    {
+      "path": "api/test/local-admin-tools/proxy.mjs",
+      "serverSha256": "40622697ceac1e140909ffeade82686c679079a398111b6b2e7ed6915ca8e7fe",
+      "exportSha256": "40622697ceac1e140909ffeade82686c679079a398111b6b2e7ed6915ca8e7fe",
+      "modified": false
+    },
+    {
+      "path": "api/test/api.test.mjs",
+      "serverSha256": "0c046b528d100f1df8d858f4be8ec3932d361bc048e44659ccf78a0901e800ca",
+      "exportSha256": "0c046b528d100f1df8d858f4be8ec3932d361bc048e44659ccf78a0901e800ca",
+      "modified": false
+    },
+    {
+      "path": "api/test/maps.test.mjs",
+      "serverSha256": "afdbc6604182cc7d0160f42ac0c0457e59d88757ad76d6eacb3f71e5f681f903",
+      "exportSha256": "afdbc6604182cc7d0160f42ac0c0457e59d88757ad76d6eacb3f71e5f681f903",
+      "modified": false
+    },
+    {
+      "path": "api/map-worker/worker.mjs",
+      "serverSha256": "92d78a48938d8a7c492bbefb6e0ca45f1d9bf5e921f6622af74a5f288e82783d",
+      "exportSha256": "92d78a48938d8a7c492bbefb6e0ca45f1d9bf5e921f6622af74a5f288e82783d",
+      "modified": false
+    },
+    {
+      "path": "api/map-worker/Dockerfile",
+      "serverSha256": "d7f6978a882c1b43439bf2a2faf4777c14ab5b5be6377f37b10f41c54b1f3777",
+      "exportSha256": "d7f6978a882c1b43439bf2a2faf4777c14ab5b5be6377f37b10f41c54b1f3777",
+      "modified": false
+    },
+    {
+      "path": "api/worker/gildam-worker.mjs",
+      "serverSha256": "92d78a48938d8a7c492bbefb6e0ca45f1d9bf5e921f6622af74a5f288e82783d",
+      "exportSha256": "92d78a48938d8a7c492bbefb6e0ca45f1d9bf5e921f6622af74a5f288e82783d",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generate-styles.cjs",
+      "serverSha256": "55ad3e350d773ee3d9d3e29c71d760ecb079e6d0070142aa638e372e3876354c",
+      "exportSha256": "79872cab3a50b96636ac1b2186a02c49647c969f61456d274124a294de49eda7",
+      "modified": true
+    },
+    {
+      "path": "api/styles/gildam.json",
+      "serverSha256": "98c474c74829760a8e2c915696ae3494b5fe98bc678d9f90334cf556a2a304bf",
+      "exportSha256": "98c474c74829760a8e2c915696ae3494b5fe98bc678d9f90334cf556a2a304bf",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/grayscale.json",
+      "serverSha256": "436a31cf74de3afb35b8f826fa5576d30106ab7ade57b64e15e08411d26ed740",
+      "exportSha256": "436a31cf74de3afb35b8f826fa5576d30106ab7ade57b64e15e08411d26ed740",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/dark.json",
+      "serverSha256": "33bcff31afcd82a2b94e9eaf93733159af583d5f11584be113e7dd9229a5e89d",
+      "exportSha256": "33bcff31afcd82a2b94e9eaf93733159af583d5f11584be113e7dd9229a5e89d",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/index.json",
+      "serverSha256": "8dc7d48264807e307a9b5a5d80f3efc58c19d70b06b493519814d3e23b451d36",
+      "exportSha256": "8dc7d48264807e307a9b5a5d80f3efc58c19d70b06b493519814d3e23b451d36",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/gildam.json",
+      "serverSha256": "424606de043706705176c9c1ce1ac7e30944a62e5ed4e4003af481dcb848292b",
+      "exportSha256": "424606de043706705176c9c1ce1ac7e30944a62e5ed4e4003af481dcb848292b",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/light.json",
+      "serverSha256": "ac73b93f136d959a4927aed7cb43222151c4e2225f632c9115cedc5f76017e42",
+      "exportSha256": "ac73b93f136d959a4927aed7cb43222151c4e2225f632c9115cedc5f76017e42",
+      "modified": false
+    },
+    {
+      "path": "api/styles/generated/outdoor.json",
+      "serverSha256": "f886515dfbc5a4559abdb496edb11856d07e1f5d26f63b644313354186102baf",
+      "exportSha256": "f886515dfbc5a4559abdb496edb11856d07e1f5d26f63b644313354186102baf",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/app.js",
+      "serverSha256": "1e33ac4c66d20d1d4fa9dbb9515181052c6deecc735d60d87add29b3326e836d",
+      "exportSha256": "1e33ac4c66d20d1d4fa9dbb9515181052c6deecc735d60d87add29b3326e836d",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/app.css",
+      "serverSha256": "eb1d533d08469569bcf8c7afff2f46af0a09066a4c4d6e23a5dac24b31e249e0",
+      "exportSha256": "eb1d533d08469569bcf8c7afff2f46af0a09066a4c4d6e23a5dac24b31e249e0",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/editor.css",
+      "serverSha256": "859f7d2442933e1494ef22abcf2959f13a2819ce46132677b1c33fcb0bdd1649",
+      "exportSha256": "859f7d2442933e1494ef22abcf2959f13a2819ce46132677b1c33fcb0bdd1649",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/gpx-model.js",
+      "serverSha256": "a55e7df9224223591be0f9a52d8fe2ae74fb8e9e454e2bc93a7863f3a496ca39",
+      "exportSha256": "a55e7df9224223591be0f9a52d8fe2ae74fb8e9e454e2bc93a7863f3a496ca39",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/gpx-editor.js",
+      "serverSha256": "9b1ea84e2d930947d16b3ef2d2313f055d1a2d60cc39d8715dcfad726f6d9572",
+      "exportSha256": "9b1ea84e2d930947d16b3ef2d2313f055d1a2d60cc39d8715dcfad726f6d9572",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/index.html",
+      "serverSha256": "4bb32719720dcd67adac72edd2cdb2af11b1ff665b757490bdf1911f1cdfff66",
+      "exportSha256": "4bb32719720dcd67adac72edd2cdb2af11b1ff665b757490bdf1911f1cdfff66",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/places.js",
+      "serverSha256": "7ae96910b59cf8921f087fe52381fad56a327a52eb2fcc5d47cb1f676ff1edfb",
+      "exportSha256": "7ae96910b59cf8921f087fe52381fad56a327a52eb2fcc5d47cb1f676ff1edfb",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/places/tourism.geojson",
+      "serverSha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90",
+      "exportSha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90",
+      "modified": false
+    },
+    {
+      "path": "api/web/public/places/status.json",
+      "serverSha256": "7e8fcf8379b682efb7e392c17e45e945d9f2f53a105d2ff31de5d3f55ff556dd",
+      "exportSha256": "7e8fcf8379b682efb7e392c17e45e945d9f2f53a105d2ff31de5d3f55ff556dd",
+      "modified": false
+    },
+    {
+      "path": "api/tourism-tools/README-tourism.md",
+      "serverSha256": "53252f620ef282d7597bd7d9b411cc63da538e400c1f39f932a8c9b7c4bb3b8a",
+      "exportSha256": "53252f620ef282d7597bd7d9b411cc63da538e400c1f39f932a8c9b7c4bb3b8a",
+      "modified": false
+    },
+    {
+      "path": "api/tourism-tools/tourism-adapter.mjs",
+      "serverSha256": "b35078116b6b55457e86e04a8ba120b5606f4b5c92e6cd7e1835d214ac4f522f",
+      "exportSha256": "b35078116b6b55457e86e04a8ba120b5606f4b5c92e6cd7e1835d214ac4f522f",
+      "modified": false
+    },
+    {
+      "path": "api/tourism-tools/sync-tourism.mjs",
+      "serverSha256": "bc05f105081611490a2595530f6b1485cbfee13fad9aeae7f80f7240f4a6008a",
+      "exportSha256": "bc05f105081611490a2595530f6b1485cbfee13fad9aeae7f80f7240f4a6008a",
+      "modified": false
+    },
+    {
+      "path": "api/editor-docs/README-editor.md",
+      "serverSha256": "eedd9ffbcaf344647d19348593cb5fb328da44fbdf2cd1c42e5e9975f3627535",
+      "exportSha256": "eedd9ffbcaf344647d19348593cb5fb328da44fbdf2cd1c42e5e9975f3627535",
+      "modified": false
+    },
+    {
+      "path": "routing/compose.yml",
+      "serverSha256": "678e7e42695982fea8192eabb31d753d2c1783e0d5b6ab4919185987baf23c31",
+      "exportSha256": "678e7e42695982fea8192eabb31d753d2c1783e0d5b6ab4919185987baf23c31",
+      "modified": false
+    },
+    {
+      "path": "routing/routing-proxy.mjs",
+      "serverSha256": "758a8e203a55e9649704d4a932e04b1bded0ee4702b75178301eaa76dd816ea2",
+      "exportSha256": "758a8e203a55e9649704d4a932e04b1bded0ee4702b75178301eaa76dd816ea2",
+      "modified": false
+    },
+    {
+      "path": "routing/README-routing.md",
+      "serverSha256": "a0211026ca44f530d2dc5560867d6350c8df1ba9e1ae1f5c9702ac1171af7eae",
+      "exportSha256": "a0211026ca44f530d2dc5560867d6350c8df1ba9e1ae1f5c9702ac1171af7eae",
+      "modified": false
+    },
+    {
+      "path": "routing/LICENSE.brouter",
+      "serverSha256": "73408906d3e5226b76a3649051221c7faadb076fac25013feb600821b923f05e",
+      "exportSha256": "73408906d3e5226b76a3649051221c7faadb076fac25013feb600821b923f05e",
+      "modified": false
+    },
+    {
+      "path": "routing/profiles2/gildam-walk.brf",
+      "serverSha256": "ce909e84d3c021a2c03da11fabfd03b9dd5c20ffe1291e049a910d45173034d7",
+      "exportSha256": "ce909e84d3c021a2c03da11fabfd03b9dd5c20ffe1291e049a910d45173034d7",
+      "modified": false
+    },
+    {
+      "path": "routing/profiles2/gildam-hike.brf",
+      "serverSha256": "9c597c7cd052e76a638ebbe9142e762b1110d159af7e6875079fad781cb609b9",
+      "exportSha256": "9c597c7cd052e76a638ebbe9142e762b1110d159af7e6875079fad781cb609b9",
+      "modified": false
+    },
+    {
+      "path": "routing/profiles2/gildam-bike.brf",
+      "serverSha256": "0c0e6be8bbd6be47b32824efc4b656543ccdefcc2351e65752dfa23ab6bee1d4",
+      "exportSha256": "0c0e6be8bbd6be47b32824efc4b656543ccdefcc2351e65752dfa23ab6bee1d4",
+      "modified": false
+    },
+    {
+      "path": "routing/profiles2/readme.txt",
+      "serverSha256": "bb367eba9dd432886cef07c1a95e24ac20cced72945a0c511141cc416527ea9c",
+      "exportSha256": "78947684a60b9cbe1b82dd809960224c0db76c5a8bcd96dceabcc0b70dc73935",
+      "modified": true
+    }
+  ]
+}

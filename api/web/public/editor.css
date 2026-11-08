@@ -1,0 +1,14 @@
+#connection[hidden],#gpxTools[hidden],#cDrawHint[hidden],#cRetry[hidden]{display:none!important}
+#gpxTools{border:1px solid var(--ln,#d9ddd8);border-radius:12px;padding:10px;margin:10px 0;background:#fbfcf9}
+#gpxTools select,#gpxTools input[type=number]{font:inherit;border:1px solid #cbd4cb;border-radius:7px;padding:6px;max-width:100%;box-sizing:border-box}
+#gpxTools .btns{gap:5px}#gpxTools .btns button{white-space:normal;min-width:100px;line-height:1.35}
+#gpxStatus{overflow-wrap:anywhere;font-weight:600}#gpxTools label{font-size:13px}
+#gpxApply:disabled,#cExport:disabled,#cSave:disabled,#cLoop:disabled{opacity:.5;cursor:not-allowed}
+#gpxDirectBar[hidden]{display:none!important}
+#gpxAdvanced{border-top:1px solid #d9ddd8;padding-top:8px;margin-top:10px}#gpxAdvanced summary{cursor:pointer;font-weight:600;font-size:13px}
+.gpx-vertex{width:24px;height:24px;cursor:grab;touch-action:none;background:transparent}
+.gpx-vertex:after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:9px;height:9px;background:#fff;border:2px solid #2274af;border-radius:50%;box-shadow:0 1px 3px #0005}
+.gpx-vertex.selected:after{width:14px;height:14px;border-color:#fff;background:#d94030;box-shadow:0 0 0 2px #d94030}
+.gpx-vertex:focus{outline:2px solid #2f5d50;border-radius:50%}
+.gpx-midpoint{width:22px;height:22px;background:#fff;border:2px solid #2f8050;border-radius:50%;text-align:center;line-height:18px;color:#237044;font-weight:700;cursor:copy;touch-action:none}
+#gpxDirectStatus{font-weight:600}#gpxDirectBar .btns button{min-width:85px}#gpxDirectToggle{font-weight:700}

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>길담 지도 · 길이야기</title>
+<meta name="description" content="길담 — GPX 기록을 지도에 겹쳐 비교하고 나만의 코스를 그려 보세요. 파일은 서버로 올라가지 않아요.">
+<meta name="theme-color" content="#2f5d50">
+<link rel="stylesheet" href="vendor/maplibre-gl.css?v=10-gapfix1">
+<link rel="stylesheet" href="app.css?v=10-gapfix1">
+<link rel="stylesheet" href="editor.css?v=10-gapfix1">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">길</span><div><b>길담</b><small>길이야기 · nuni</small></div></div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="tracks" role="tab">기록 비교</button>
+    <button class="tab" data-tab="course" role="tab">코스 편집</button>
+  </nav>
+</header>
+<main>
+  <div id="map" aria-label="지도"></div>
+  <div class="notice" id="notice" hidden>🧪 지금 지도는 <b>서울 도심 일부</b>만 담긴 시험판이에요. 범위 밖은 비어 보여요. <button id="noticeX" aria-label="닫기">✕</button></div>
+  <aside class="panel" id="panel">
+    <div class="grip" id="grip"></div>
+    <section data-pane="tracks">
+      <h2>GPX 기록 비교</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" multiple hidden>
+        <span class="dropicon">⬆</span>
+        <span><b>GPX 파일을 끌어다 놓거나 눌러서 선택</b><br><small>여러 개 가능 · 🔒 파일은 이 브라우저에서만 읽고 서버로 올리지 않아요</small></span>
+      </label>
+      <div id="trackList" class="list"></div>
+      <div class="chartbox" id="chartBox" hidden>
+        <div class="seg"><button data-m="ele" class="on">고도</button><button data-m="spd">속도</button></div>
+        <canvas id="chart" height="150"></canvas>
+      </div>
+      <div class="row small"><label><input type="checkbox" id="stripT" checked> 내보낼 때 시각 정보 지우기</label></div>
+    </section>
+    <section data-pane="course" hidden>
+      <h2>코스 편집</h2>
+      <div class="btns" role="group" aria-label="편집 시작 또는 전환"><button id="editNew" class="pri" aria-pressed="true">새 코스 만들기</button><label id="editImport" class="btn" role="button" tabindex="0" aria-pressed="false">GPX 불러와 수정하기<input id="editGpxInput" type="file" accept=".gpx,application/gpx+xml" hidden></label></div>
+      <p id="editorMode" role="status" style="padding:8px;border-left:3px solid #2f5d50;background:#edf4ef;font-weight:600;overflow-wrap:anywhere">현재 새 코스 편집</p>
+      <p id="editorImportStatus" role="status" aria-live="polite" class="hint small" style="white-space:pre-wrap;overflow-wrap:anywhere">GPX를 선택하면 읽기 결과가 여기에 표시됩니다.</p>
+      <p class="hint small">새 코스와 GPX 수정본을 같은 지도에서 편집합니다. 원본 파일은 바뀌지 않습니다.</p>
+      <section id="gpxTools" hidden>
+        <p class="hint">회색: 원본 · 빨강: 수정본 · 주황: 적용 전 경로. 작은 원을 직접 끌어 점을 이동할 수 있습니다. 원본 GPX의 모든 점과 끊긴 구간을 유지합니다.</p>
+        <div class="btns"><button id="gpxDirectToggle" class="pri" aria-pressed="false">지도에서 편집</button></div>
+        <p id="gpxDirectStatus" class="hint" role="status"></p>
+        <div id="gpxDirectBar" hidden>
+          <div class="btns" role="group" aria-label="지도 점 편집 도구"><button id="gpxToolMove" aria-pressed="true">점 이동</button><button id="gpxToolAdd" aria-pressed="false">점 추가</button><button id="gpxToolDelete" aria-pressed="false">점 삭제</button><button id="gpxToolRange" aria-pressed="false">구간 선택</button></div>
+          <div class="btns"><button id="gpxRangeRemove" disabled>선택 구간 삭제 · 앞뒤 분리</button><button id="gpxDirectUndo">↶ 되돌리기</button></div>
+          <div class="btns"><button id="gpxPointPrev">이전 점</button><button id="gpxPointNext">다음 점</button><button id="gpxPointZoom">선택 점 확대</button></div>
+          <p id="gpxHandleCount" class="hint small"></p>
+        </div>
+        <label>현재 구간 <select id="gpxSegment" class="field"></select></label>
+        <details id="gpxAdvanced"><summary>고급 · 선택 구간 길 따라 / 범위 자르기</summary>
+        <div class="btns"><label>시작 점 <input id="gpxStart" type="number" min="1" value="1" style="width:75px"></label><label>끝 점 <input id="gpxEnd" type="number" min="1" value="2" style="width:75px"></label></div>
+        <div class="btns"><button id="gpxPickStart">지도에서 시작 선택</button><button id="gpxPickEnd">지도에서 끝 선택</button><button id="gpxMove">시작 점 옮기기</button><button id="gpxInsert">시작 뒤 점 추가</button><button id="gpxDelete">시작 점 삭제</button></div>
+        <p class="hint small">번호를 입력하거나 지도에서 실제 점을 선택하세요. 시작·끝은 같은 구간에서 선택하고, 각 점 이동은 위의 점 이동 도구를 사용하세요.</p>
+        <div class="btns"><button id="gpxTrim">선택 구간의 시작~끝만 남기기</button><button id="gpxRoute">선택 부분 길 따라 미리보기</button></div>
+        <div class="btns"><button id="gpxApply" disabled>미리보기 적용</button><button id="gpxCancel">미리보기 취소</button></div>
+        <p class="hint small">길 따라는 아래 걷기·등산·자전거 기준입니다. 확인 후 선택한 양 끝점 2개만 길담 서버로 보냅니다. 원본 GPX는 전송하지 않습니다. 양 끝점 간격은 30km 이내로 선택하세요. 길에 맞춘 대체 경로는 별도 구간으로 저장하여 원본과의 틈을 임의 직선으로 잇지 않습니다.</p>
+        </details>
+        <label><input id="gpxStripTime" type="checkbox"> 수정본에서 원본 시각 정보 제거</label>
+        <p id="gpxStatus" role="status" class="hint"></p>
+        <p class="hint small">수정·추가한 점은 원래 시각·고도·확장값을 복사하지 않습니다. 고도 그래프는 선택 구간만 표시합니다. 수정본을 저장한 후 목록에서 다시 열 수 있습니다.</p>
+      </section>
+      <p id="cDrawHint" class="hint">지도를 눌러 지점을 추가하고, 점을 끌어 옮기세요. <span class="chip">길 따라 자동 연결</span> 지점 간격은 30km 이내로 찍으세요. 지점을 오른쪽 클릭하면 삭제합니다.</p>
+      <div class="seg" id="connection"><button data-v="follow" class="on">길 따라</button><button data-v="straight">직선 / GPX 원본</button></div>
+      <p class="hint small">길 따라 모드에서는 찍은 경유점만 길담 서버로 보내 계산합니다. GPX 파일은 브라우저에서만 읽습니다. 지도에 없는 길·통제·위험구간은 반영되지 않을 수 있습니다.</p>
+      <p id="cRouteStatus" role="status" aria-live="polite" class="hint"></p><button id="cRetry">경로 다시 계산</button>
+      <div class="stats" id="cStats"></div>
+      <div class="seg" id="mode"><button data-v="walk" class="on">🚶 걷기 4km/h</button><button data-v="hike">🥾 등산 3km/h</button><button data-v="bike">🚲 자전거 15km/h</button></div>
+      <input id="cName" class="field" placeholder="코스 이름" maxlength="60">
+      <div class="btns">
+        <button id="cUndo">↶ 되돌리기</button><button id="cDelete">마지막 점 삭제</button>
+        <button id="cLoop">⟲ 출발점으로 닫기</button>
+        <button id="cClear">지우기</button>
+      </div>
+      <div class="btns">
+        <button id="cSave" class="pri">브라우저에 저장</button>
+        <button id="cExport" class="pri">GPX 내보내기</button>
+        <label class="btn">GPX 바꾸기<input type="file" id="cImport" accept=".gpx" hidden></label>
+      </div>
+      <div class="chartbox" id="cChartBox" hidden><canvas id="cChart" height="130"></canvas></div>
+      <p class="hint small" id="cEleHint">⛰ 고도는 지형 고도 데이터(DEM)에서 읽어요. 30m 해상도라 실제와 조금 다를 수 있어요.</p>
+      <h3>저장한 코스</h3>
+      <div id="saved" class="list"></div>
+      <p class="hint small">💾 코스는 이 브라우저(localStorage)에만 저장돼요. 로그인·서버 저장은 다음 버전에서요.</p>
+    </section>
+    <footer class="foot">지도 데이터 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 기여자 · 경로 계산 <a href="https://brouter.de/brouter/" target="_blank" rel="noopener">BRouter</a> (MIT) · © <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> · <a href="https://www.nuni.co.kr" target="_blank" rel="noopener">nuni</a></footer>
+  </aside>
+  <div class="layers" id="layers" hidden>
+    <div class="sseg" id="styleSeg" role="radiogroup" aria-label="지도 스타일"></div>
+    <label class="tl"><input type="checkbox" id="lyPlaces" checked> 주요 건물·관광지·공원</label>
+    <small>확대하면 지도에 등록된 장소명이 표시됩니다.</small>
+    <p id="tourismStatus" class="hint small" style="max-width:220px">관광공사 보강 상태 확인 중…</p>
+    <label class="tl"><input type="checkbox" id="lyHill" checked> 음영 기복</label>
+    <label class="tl"><input type="checkbox" id="lyCont"> 등고선</label>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+</main>
+<script>
+window.addEventListener('load',function(){var n=document.getElementById('editorImportStatus');if(!n)return;if(!window.__gpxEditor&&n.textContent.indexOf('편집기 준비 오류:')!==0){n.textContent='GPX 편집기를 준비하지 못했습니다. Ctrl+F5로 새로고침해 주세요. 계속되면 이 화면을 보내 주세요.';n.style.color='#b42318';}else if(n.textContent==='GPX를 선택하면 읽기 결과가 여기에 표시됩니다.'){n.textContent='GPX 편집기 준비 완료 · 파일을 선택하면 읽기 결과가 여기에 계속 표시됩니다.';}});
+window.addEventListener('error',function(e){var file=e.filename||(e.target&&e.target.src)||'';if(!/(gpx-model|gpx-editor|app)\.js/.test(file))return;var n=document.getElementById('editorImportStatus');if(n){n.textContent='편집기 준비 오류: '+(e.message||'스크립트를 내려받지 못했습니다.')+' · Ctrl+F5 새로고침 후에도 같으면 이 문구를 보내 주세요.';n.style.color='#b42318';}},true);
+</script>
+<script src="vendor/maplibre-gl.js?v=10-gapfix1"></script>
+<script src="vendor/pmtiles.js?v=10-gapfix1"></script>
+<script src="vendor/basemaps.js?v=10-gapfix1"></script>
+<script src="vendor/maplibre-contour.js?v=10-gapfix1"></script>
+<script src="gpx-model.js?v=10-gapfix1"></script>
+<script src="app.js?v=10-gapfix1"></script>
+<script src="gpx-editor.js?v=10-gapfix1"></script>
+<script src="places.js?v=10-gapfix1"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# Credentials and private runtime files
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*
+*secrets*
+# Personal tracks/databases and operational state
+*.gpx
+!tests/fixtures/qa-segments.gpx
+*.db
+*.sqlite*
+*.db-*
+**/uploads/
+**/logs/
+**/backups/
+**/data/
+*.log
+*.bak*
+# Downloaded/generated large assets and tools
+node_modules/
+**/vendor/
+**/fonts/
+**/sprites/
+**/segments4/
+**/tiles/current/
+**/tiles/releases/
+*.pmtiles
+*.pbf
+*.osm*
+*.rd5
+*.jar
+*.tgz
+*.zip
+**/.cache/
+coverage/
+.DS_Store
