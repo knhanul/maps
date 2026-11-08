@@ -18,6 +18,8 @@ h2{font-size:17px;margin:0 0 12px}h3{font-size:14px;margin:18px 0 8px}
 .drop{display:flex;gap:12px;align-items:center;border:1.5px dashed #b9c9c0;background:var(--pri2);border-radius:14px;padding:14px;cursor:pointer;font-size:14px}
 .drop.over{border-color:var(--pri);background:#d3e6dc}.drop small{color:var(--mut)}
 .dropicon{width:36px;height:36px;border-radius:50%;background:var(--pri);color:#fff;display:grid;place-items:center;flex:none}
+.stored-track{display:block;margin-top:14px;font-size:13px;font-weight:600;color:var(--pri)}
+.stored-track[hidden]{display:none}.stored-track select{display:block;margin-top:6px;background:var(--sur)}
 .list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .card{border:1px solid var(--ln);border-radius:14px;padding:10px 12px}
 .card .hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.card .hd .nm{flex:1 1 calc(100% - 24px)}.card .nm{flex:1;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -49,8 +51,8 @@ canvas{width:100%;display:block}
 @media (max-width:720px){
  .top{padding:8px 12px}.brand small{display:none}.tab{padding:7px 11px;font-size:13px}
  .notice{top:8px;font-size:12px}
- .panel,.notice~.panel{top:auto;left:0;right:0;bottom:0;width:auto;max-height:52%;border-radius:20px 20px 0 0;padding:6px 16px 16px}
- .panel.min{max-height:96px;overflow:hidden}
+ .panel,.notice~.panel,.notice:not([hidden])~.panel{top:auto;left:0;right:0;bottom:0;width:auto;max-height:52%;border-radius:20px 20px 0 0;padding:6px 16px 16px}
+ .panel.min,.notice:not([hidden])~.panel.min{max-height:96px;overflow:hidden}
  .grip{display:block;width:40px;height:5px;border-radius:3px;background:#ccc;margin:4px auto 10px;cursor:pointer}
  .toast{bottom:calc(52% + 12px)}
 }

@@ -1,6 +1,6 @@
 # 길담 지도 WEB 소스
 
-https://maps.nuni.co.kr 운영 서버의 소스 스냅샷입니다. WEB `v10-gapfix1` 기준이며 Android 앱 저장소는 아닙니다. 기존 PUBLIC 저장소의 공개 범위는 변경하지 않았습니다.
+https://maps.nuni.co.kr 운영 서버의 소스 스냅샷입니다. WEB `v10-gapfix1` 운영 스냅샷에 `v12-pointedit`(점 단위 편집 개편·길 따라 보정, 미배포) 변경을 더한 상태이며 Android 앱 저장소는 아닙니다. 기존 PUBLIC 저장소의 공개 범위는 변경하지 않았습니다.
 
 ## 구성
 - `api/web/public/`: 지도, POI, 길 따라 코스 생성, 브라우저 내 원본 보존 GPX 직접 편집

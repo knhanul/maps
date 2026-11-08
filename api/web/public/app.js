@@ -97,7 +97,7 @@ async function initMap() {
   map.addSource("course", { type: "geojson", data: fc([]) });
   map.addLayer({ id: "course-casing", type: "line", source: "course", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#fff", "line-width": 8 } });
   map.addLayer({ id: "course", type: "line", source: "course", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#d2453b", "line-width": 4, "line-dasharray": [2, 1.2] } });
-  map.on("click", e => { if(tab==="course"&&window.__gpxEditor?.active){window.__gpxEditor.mapClick(e);return;} if(window.__openPlace?.(e))return; if (tab === "course") addPt([e.lngLat.lng, e.lngLat.lat]); });
+  map.on("click", e => { if(tab==="course"&&window.__trace?.mapClick(e))return; if(tab==="course"&&window.__gpxEditor?.active){window.__gpxEditor.mapClick(e);return;} if(window.__openPlace?.(e))return; if (tab === "course") addPt([e.lngLat.lng, e.lngLat.lat]); });
   renderTracks(); renderCourse();
   window.__map = map; window.__switchStyle = switchStyle; window.__elevAt = elevAt; window.__gildamReady = true; window.__gildamManifest = manifest; window.__applyPlaces?.(true);
 }
@@ -220,11 +220,12 @@ $$(".tab").forEach(b => b.onclick = () => {
   tab = b.dataset.tab; $$(".tab").forEach(x => x.classList.toggle("active", x === b));
   $$("[data-pane]").forEach(s => s.hidden = s.dataset.pane !== tab);
   if (map) map.getCanvas().style.cursor = tab === "course" ? "crosshair" : "";
-  markers.forEach(m => m.getElement().style.display = tab === "course" ? "" : "none");window.__gpxEditor?.setVisible(tab==="course");
+  markers.forEach(m => m.getElement().style.display = tab === "course" ? "" : "none");window.__gpxEditor?.setVisible(tab==="course");window.__trace?.setVisible(tab==="course");
   $("#panel").classList.remove("min");
 });
 $("#noticeX").onclick = () => $("#notice").remove();
 $("#grip").onclick = () => $("#panel").classList.toggle("min");
+$("#layersBtn").onclick = () => { const open = $("#layers").classList.toggle("open"); $("#layersBtn").setAttribute("aria-expanded", String(open)); };
 
 /* ---------- tracks ---------- */
 let tracks = store.get(LS_T, []);
@@ -248,8 +249,25 @@ const drop = $("#drop");
 ["dragleave", "drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("over"); }));
 document.addEventListener("drop", e => { const fs = [...(e.dataTransfer?.files || [])].filter(f => /\.gpx$/i.test(f.name)); if (fs.length) { if (tab === "course") importCourse(fs[0]); else addFiles(fs); } });
 
+async function selectStoredTrack(id) {
+  const selected = tracks.find(t => t.id === id);
+  if (!selected) return renderTracks();
+  if (window.__gpxEditor?.active && !window.__gpxEditor.leave()) return renderTracks();
+  tracks.forEach(t => { t.on = t === selected; });
+  saveTracks();
+  renderTracks();
+  await mapInitialized;
+  if (tracks.includes(selected) && selected.on && map?.getSource("tracks")) fit(selected.pts);
+}
+$("#storedTrack").onchange = e => selectStoredTrack(e.target.value);
+
 function renderTracks() {
   const L = $("#trackList");
+  const picker = $("#storedTrack");
+  $("#storedTrackLabel").hidden = !tracks.length;
+  picker.innerHTML = `<option value="">GPX를 선택하면 지도에 표시해요</option>` + tracks.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+  const visible = tracks.filter(t => t.on);
+  picker.value = visible.length === 1 ? visible[0].id : "";
   L.innerHTML = tracks.length ? "" : `<div class="empty">아직 불러온 기록이 없어요.<br>두 개 이상 올리면 겹쳐서 비교할 수 있어요.</div>`;
   tracks.forEach(t => {
     const s = t.s || (t.s = stats(t.pts,t.breaks));
@@ -434,6 +452,11 @@ $("#cChart").addEventListener("pointermove", e => {
   let best = prof.S[0]; for (const p of prof.S) if (Math.abs(p[0] - d) < Math.abs(best[0] - d)) best = p;
   map.getSource("hover").setData(fc([{ type: "Feature", properties: { color: "#d2453b" }, geometry: { type: "Point", coordinates: best[2] } }]));
 });
+$("#cChart").addEventListener("click", e => {
+  if (!prof || !window.__gpxEditor?.active) return; const r = e.target.getBoundingClientRect(), d = (e.clientX - r.left - 38) / (r.width - 46) * prof.S.at(-1)[0];
+  let best = prof.S[0]; for (const p of prof.S) if (Math.abs(p[0] - d) < Math.abs(best[0] - d)) best = p;
+  window.__gpxEditor.selectNear(best[2]);
+});
 $("#cChart").addEventListener("pointerleave", () => map && map.getSource("hover").setData(fc([])));
 $$("#mode button").forEach(b => b.onclick = () => { if(mode===b.dataset.v)return;if(!window.__gpxEditor?.active)snap();mode = b.dataset.v; $$("#mode button").forEach(x => x.classList.toggle("on", x === b)); renderCourse(); });
 $("#cUndo").onclick = () => { if (!hist.length) return toast("되돌릴 게 없어요"); const previous=JSON.parse(hist.pop());course=previous.course;follow=previous.follow;mode=previous.mode;renderCourse(); };
@@ -464,5 +487,5 @@ window.__courseBridge={refreshTracks:renderTracks,map:()=>map,toast,fit,download
   resume:()=>renderCourse(),
   save:item=>{const k=saved.findIndex(c=>c.name===item.name);if(k>=0&&!confirm("같은 이름의 브라우저 저장본을 바꿀까요? 원본 파일은 바뀌지 않습니다."))return false;const next=saved.slice();if(k>=0)next[k]=item;else next.unshift(item);if(!store.set(LS_C,next))return false;saved=next;renderSaved();return true;}};
 renderTracks(); renderSaved(); courseStats();
-initMap();
+const mapInitialized = initMap();
 })();
