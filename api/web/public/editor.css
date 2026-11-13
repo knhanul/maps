@@ -1,12 +1,13 @@
 #connection[hidden],#gpxTools[hidden],#cDrawHint[hidden],#cRetry[hidden],#gpxDock[hidden],#gpxPreviewBar[hidden],#cEditRow[hidden],#editHint[hidden],#cRouteHint[hidden],#courseTitle[hidden],#editorImportStatus[hidden]{display:none!important}
-#gpxTools{border:1px solid var(--ln,#d9ddd8);border-radius:12px;padding:10px;margin:10px 0;background:#fbfcf9}
+#gpxTools{margin:0 0 10px}
 #gpxTools select,#gpxTools input[type=number]{font:inherit;border:1px solid #cbd4cb;border-radius:7px;padding:6px;max-width:100%;box-sizing:border-box}
 #gpxTools .btns{gap:5px}#gpxTools .btns button{white-space:normal;min-width:100px;line-height:1.35}
 #gpxStatus{overflow-wrap:anywhere;font-weight:600;margin:6px 0}#gpxStatus:empty{display:none}#gpxTools label{font-size:13px}
 #gpxApply:disabled,#cExport:disabled,#cSave:disabled,#cLoop:disabled{opacity:.5;cursor:not-allowed}
 #gpxAdvanced,#gpxHelp{border-top:1px solid #d9ddd8;padding-top:8px;margin-top:8px}#gpxAdvanced summary,#gpxHelp summary{cursor:pointer;font-weight:600;font-size:13px}
-/* Sticky point toolbar: stays visible while the panel scrolls (and in the minimized mobile sheet). */
-.gpx-dock{position:sticky;top:-16px;z-index:4;display:flex;align-items:center;gap:3px;margin:-16px -18px 10px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--ln,#e4e2dc);border-radius:var(--r,16px) var(--r,16px) 0 0}
+/* Point toolbar floats on the map next to the panel, so editing never needs the panel scrolled into place. */
+.gpx-dock{position:absolute;top:12px;left:384px;z-index:3;display:flex;align-items:center;gap:3px;padding:6px 8px;background:#fff;border-radius:14px;box-shadow:0 4px 16px #0003;max-width:calc(100% - 450px)}
+.notice:not([hidden])~.gpx-dock{top:60px}
 .gpx-dock button{border:1px solid var(--ln,#e4e2dc);background:#fff;border-radius:10px;min-width:34px;height:36px;padding:0 8px;flex:none;font:inherit;font-size:13px;cursor:pointer;color:var(--tx,#1d2420)}
 .gpx-dock button:hover:not(:disabled){background:#f2f6f3}.gpx-dock button:disabled{opacity:.4;cursor:not-allowed}
 .gpx-dock button.pri{background:var(--pri,#2f5d50);border-color:var(--pri,#2f5d50);color:#fff}
@@ -45,26 +46,29 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid #cbd0cc;border-bottom-wi
 #mode[hidden],#gpxSnapActions[hidden]{display:none!important}
 .snapbox{border:1px solid #cfe0d6;background:#f3f8f4;border-radius:12px;padding:8px 10px;margin:8px 0}
 .snaprow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.snaprow .seg{flex:1 1 170px;margin:0}
-#gpxSnapToggle{border:1px solid #b9c9c0;background:#fff;border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--tx,#1d2420);white-space:nowrap}
-#gpxSnapToggle b{display:inline-block;min-width:30px;margin-left:4px;padding:1px 6px;border-radius:999px;background:#e4e2dc;color:#66706a;font-size:11px}
-#gpxSnapToggle.on{border-color:var(--pri,#2f5d50)}#gpxSnapToggle.on b{background:var(--pri,#2f5d50);color:#fff}
+.movehd{font-size:12px;font-weight:700;color:var(--mut,#66706a);margin-bottom:5px}
+.snapbox .seg{margin:0 0 5px;background:#e3ebe5}#gpxSnapMode[hidden]{display:none!important}
+#gpxMoveAdvanced summary{cursor:pointer;font-size:12px;color:var(--mut,#66706a)}#gpxMoveAdvanced[open] summary{margin-bottom:2px}
+.pc-more{margin:0 0 8px}.pc-more summary{cursor:pointer;font-size:12px;color:var(--mut,#66706a)}.pc-more .pc-grid{margin:6px 0 0}
 .snapbox label{display:block;margin-top:6px}.snapbox select{font:inherit;font-size:12px;border:1px solid #cbd4cb;border-radius:7px;padding:3px 6px}
-#gpxSnapStatus{margin:6px 0 2px;font-size:13px;font-weight:600;overflow-wrap:anywhere}#gpxSnapStatus.err{color:#b42318}
+#gpxSnapStatus{margin:4px 0 2px;font-size:12.5px;color:#3d4641;overflow-wrap:anywhere}#gpxSnapStatus:empty{display:none}
+.snapbox[data-state=preview] #gpxSnapStatus,.snapbox[data-state=error] #gpxSnapStatus{font-weight:700}#gpxSnapStatus.err{color:#b42318}
 .snapbox[data-state=computing] #gpxSnapStatus{color:#9a5b00}#gpxSnapDetail:empty{display:none}
 #gpxSnapActions{margin:6px 0 0}#gpxSnapActions button:disabled{opacity:.5;cursor:not-allowed}
-/* Mobile: map settings collapse behind a button so they never cover the editor sheet */
-.layers-btn{display:none}
 @media (max-width:720px){
- .gpx-dock{top:-6px;margin:-6px -16px 8px;padding:8px 10px;border-radius:0}
- .gpx-dock button{height:40px;min-width:40px}
+ .gpx-dock,.notice:not([hidden])~.gpx-dock{top:8px;left:8px;right:8px;max-width:none;justify-content:center;gap:2px;overflow-x:auto;padding:5px 6px;border-radius:12px}
+ .notice:not([hidden])~.gpx-dock{top:56px}
+ .gpx-dock button{height:40px;min-width:34px;padding:0 5px}.gpx-dock .dock-label{min-width:56px}
+ /* the toolbar takes the top row, so the map buttons move below it */
+ main:has(#gpxDock:not([hidden])) .maplibregl-ctrl-top-right{margin-top:56px}
+ main:has(#gpxDock:not([hidden])) .layers-btn{top:206px}main:has(#gpxDock:not([hidden])) .layers{top:246px}
  .pc-grid{grid-template-columns:1fr 1fr}.pc-grid div:first-child{grid-column:span 2}
- .layers-btn{display:block;position:absolute;top:120px;right:10px;z-index:2;border:0;background:#fff;border-radius:10px;box-shadow:0 2px 8px #0002;padding:8px 10px;font:inherit;font-size:12.5px}
- .layers:not(.open){display:none!important}.layers{top:160px!important}
- .panel.min .gpx-dock~*{visibility:hidden}
 }
 /* Image → GPX tracing */
 #traceTools{margin:8px 0}#traceTools [hidden]{display:none!important}
-.trace-start{display:block;text-align:left;white-space:normal;line-height:1.4;font-weight:600}.trace-start small{display:block;font-weight:400;font-size:11.5px;color:var(--mut,#66706a);margin-top:2px}
+.trace-start{display:block;cursor:pointer;line-height:1.4;font-size:13px;font-weight:600;color:var(--pri,#2f5d50);text-decoration:underline;text-underline-offset:3px;margin-top:14px}.trace-start small{display:none}
+[data-stage=start] .trace-start small{display:block;font-weight:400;font-size:11.5px;color:var(--mut,#66706a);margin-top:2px;text-decoration:none}
+[data-stage=gpx] #traceTools:not(.has-image){display:none}
 #traceTools.has-image .trace-start small{display:none}
 #traceTools:not(.has-image) .trace-closerow,#traceTools:not(.has-image) #traceStatus:empty{display:none}
 .trace-step{border:1px solid #d9e2dc;border-radius:12px;padding:8px 10px;margin:8px 0;background:#fbfcf9}
@@ -81,3 +85,5 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid #cbd0cc;border-bottom-wi
 .trace-mark{min-width:24px;height:24px;border-radius:12px;padding:0 6px;display:grid;place-items:center;color:#fff;font:700 12px/1 system-ui;border:2px solid #fff;box-shadow:0 1px 4px #0006;background:#7b3fe4;pointer-events:none}
 .trace-mark.a{background:#17a673}.trace-mark.b{background:#d2453b}
 .trace-pair{width:18px;height:18px;color:#d0021b;font:700 20px/18px system-ui;text-align:center;text-shadow:0 0 3px #fff;pointer-events:none}
+[data-stage=gpx] #cRouteStatus{display:none}
+.pc-acts .pc-other{grid-column:span 2;border-color:#b9c9c0;background:#f3f8f4}

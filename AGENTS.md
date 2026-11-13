@@ -4,6 +4,8 @@
 - Plain browser JS, no build step. Cache-buster query `?v=...` in index.html must be bumped when JS/CSS change.
 - `web/public/vendor/` (MapLibre GL 5, PMTiles 4, @protomaps/basemaps 5, maplibre-contour) is gitignored; not in repo.
 - Image→GPX tracing: trace-model.js (pure) + trace.js (UI, `window.__trace`, hooked first in app.js map click).
+- Product name is 길담 스튜디오. Course pane has stages `start`/`new`/`gpx` (`data-stage`, app.js `courseStage()`); the point toolbar `#gpxDock` lives on the map, not in the panel.
+- Point move modes (`#gpxMoveMode`): soft (default, `M.softMove`), single, road (auto-applies unless suspicious). E2E harness pins single + confirm via localStorage `gildam.move.v1`.
 - GPX editor: gpx-model.js (pure model, DOM only for parse/export) + gpx-editor.js (UI) + app.js bridge (`window.__courseBridge`). Docs: api/editor-docs/README-editor.md.
 
 ## Tests

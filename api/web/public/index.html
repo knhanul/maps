@@ -3,58 +3,104 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>길담 지도 · 길이야기</title>
-<meta name="description" content="길담 — GPX 기록을 지도에 겹쳐 비교하고 나만의 코스를 그려 보세요. 파일은 서버로 올라가지 않아요.">
+<title>길담 스튜디오 · GPX 코스 편집</title>
+<meta name="description" content="길담 스튜디오 — GPX 코스를 지도에서 고치고, 새로 그리고, 겹쳐 비교하세요. 파일은 서버로 올라가지 않아요.">
 <meta name="theme-color" content="#2f5d50">
 <link rel="stylesheet" href="vendor/maplibre-gl.css?v=10-gapfix1">
-<link rel="stylesheet" href="app.css?v=12-pointedit">
-<link rel="stylesheet" href="editor.css?v=12-pointedit">
+<link rel="stylesheet" href="app.css?v=13-studio">
+<link rel="stylesheet" href="editor.css?v=13-studio">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo">길</span><div><b>길담</b><small>길이야기 · nuni</small></div></div>
+  <button class="brand" id="brand" type="button" title="처음 화면으로"><span class="logo">길</span><span><b>길담 스튜디오</b><small>GPX 코스를 만들고 다듬는 곳</small></span></button>
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="tracks" role="tab">기록 비교</button>
-    <button class="tab" data-tab="course" role="tab">코스 편집</button>
+    <button class="tab active" data-tab="course" role="tab">코스 편집</button>
+    <button class="tab" data-tab="tracks" role="tab">기록 비교</button>
   </nav>
 </header>
 <main>
   <div id="map" aria-label="지도"></div>
   <div class="notice" id="notice" hidden>🧪 지금 지도는 <b>서울 도심 일부</b>만 담긴 시험판이에요. 범위 밖은 비어 보여요. <button id="noticeX" aria-label="닫기">✕</button></div>
+  <div id="gpxDock" class="gpx-dock" role="toolbar" aria-label="점 편집 도구" hidden>
+    <button id="gpxUndo" type="button" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button><button id="gpxRedo" type="button" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행">↷</button>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button id="gpxPointPrev" type="button" title="이전 점 (←)" aria-label="이전 점">◀</button><button id="gpxPointLabel" type="button" class="dock-label" title="선택 점으로 이동 (F)">–</button><button id="gpxPointNext" type="button" title="다음 점 (→)" aria-label="다음 점">▶</button>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button id="gpxAddPoint" type="button" title="선택 점 뒤에 점 추가 (+)" aria-label="점 추가">＋</button><button id="gpxDeletePoint" type="button" title="선택 점·구간 삭제 (Delete)">삭제</button><button id="gpxRangeArm" type="button" aria-pressed="false" title="구간 선택: 누른 뒤 다른 끝 점을 선택 (PC: Shift+클릭)">구간</button>
+  </div>
+  <div class="dropveil" aria-hidden="true"><span>여기에 GPX 파일을 놓으세요</span></div>
   <aside class="panel" id="panel">
     <div class="grip" id="grip"></div>
-    <section data-pane="tracks">
-      <h2>GPX 기록 비교</h2>
-      <label class="drop" id="drop">
-        <input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" multiple hidden>
-        <span class="dropicon">⬆</span>
-        <span><b>GPX 파일을 끌어다 놓거나 눌러서 선택</b><br><small>여러 개 가능 · 🔒 파일은 이 브라우저에서만 읽고 서버로 올리지 않아요</small></span>
-      </label>
-      <label class="stored-track" id="storedTrackLabel" hidden>이전에 불러온 GPX
-        <select id="storedTrack" class="field" aria-label="이전에 불러온 GPX 선택"></select>
-      </label>
-      <div id="trackList" class="list"></div>
-      <div class="chartbox" id="chartBox" hidden>
-        <div class="seg"><button data-m="ele" class="on">고도</button><button data-m="spd">속도</button></div>
-        <canvas id="chart" height="150"></canvas>
+    <section data-pane="course" data-stage="start">
+      <h2 id="courseTitle" class="at-start">무엇을 할까요?</h2>
+      <p class="hint at-start">기록한 길을 고치거나 새 코스를 그려 GPX 파일로 받습니다. 파일은 이 브라우저 안에서만 열려요.</p>
+      <div class="btns starts" role="group" aria-label="편집 시작 또는 전환">
+        <label id="editImport" class="btn" role="button" tabindex="0" aria-pressed="false"><b>GPX 파일 열기</b><small>기록한 길을 불러와 점을 옮겨 고칩니다</small><input id="editGpxInput" type="file" accept=".gpx,application/gpx+xml" hidden></label>
+        <button id="editNew" type="button" aria-pressed="true"><b>새 코스 그리기</b><small>지도에 지점을 찍어 코스를 만듭니다</small></button>
       </div>
-      <div class="row small"><label><input type="checkbox" id="stripT" checked> 내보낼 때 시각 정보 지우기</label></div>
-    </section>
-    <section data-pane="course" hidden>
-      <div id="gpxDock" class="gpx-dock" role="toolbar" aria-label="점 편집 도구" hidden>
-        <button id="gpxUndo" type="button" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button><button id="gpxRedo" type="button" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행">↷</button>
-        <span class="dock-sep" aria-hidden="true"></span>
-        <button id="gpxPointPrev" type="button" title="이전 점 (←)" aria-label="이전 점">◀</button><button id="gpxPointLabel" type="button" class="dock-label" title="선택 점으로 이동 (F)">–</button><button id="gpxPointNext" type="button" title="다음 점 (→)" aria-label="다음 점">▶</button>
-        <span class="dock-sep" aria-hidden="true"></span>
-        <button id="gpxAddPoint" type="button" title="선택 점 뒤에 점 추가 (+)" aria-label="점 추가">＋</button><button id="gpxDeletePoint" type="button" title="선택 점·범위 삭제 (Delete)">삭제</button><button id="gpxRangeArm" type="button" aria-pressed="false" title="범위 선택: 누른 뒤 다른 끝 점을 선택 (PC: Shift+클릭)">범위</button>
+      <p id="editorMode" role="status" class="mode-title work"></p>
+      <p id="editorImportStatus" role="status" aria-live="polite" class="hint small"></p>
+      <section id="gpxTools" hidden>
+        <p class="gpx-quick">고칠 곳을 확대한 뒤 점을 <b>끌어서</b> 옮기세요. 선을 <b>누르면</b> 점이 추가되고, 점을 고른 뒤 <b>삭제</b>로 지웁니다.</p>
+        <div id="gpxSnapBox" class="snapbox" data-state="idle">
+          <div class="movehd">점을 옮길 때</div>
+          <div class="seg" id="gpxMoveMode" role="group" aria-label="점 이동 방식">
+            <button type="button" data-v="soft" title="끈 점 주변의 점들이 부드럽게 함께 움직입니다">주변 함께</button>
+            <button type="button" data-v="single" title="끈 점 하나만 움직입니다">이 점만</button>
+            <button type="button" data-v="road" id="gpxSnapToggle" role="switch" aria-checked="false" title="옮긴 점 앞뒤를 실제 길 따라 다시 잇습니다">길 따라<b id="gpxSnapState" hidden>OFF</b></button>
+          </div>
+          <div class="seg" id="gpxSnapMode" role="group" aria-label="활동 유형" hidden><button type="button" data-v="walk">걷기</button><button type="button" data-v="hike">등산</button><button type="button" data-v="bike">자전거</button></div>
+          <p id="gpxSnapStatus" role="status" aria-live="polite"></p>
+          <p id="gpxSnapDetail" class="hint small"></p>
+          <div class="btns" id="gpxSnapActions" hidden><button id="gpxSnapApply" type="button" class="pri" disabled>새 경로 적용</button><button id="gpxSnapCancel" type="button" disabled>취소</button><button id="gpxSnapRetry" type="button" disabled>다시 계산</button></div>
+          <details id="gpxMoveAdvanced"><summary>이동 상세 설정</summary>
+            <label class="small">함께 움직이는 범위 <select id="gpxSoftRange"><option value="40">좁게</option><option value="80">보통</option><option value="160">넓게</option></select></label>
+            <label class="small">길 따라 다시 잇는 범위 <select id="gpxSnapWindow"><option value="100">앞뒤 약 100m</option><option value="180">앞뒤 약 180m</option><option value="300">앞뒤 약 300m</option><option value="500">앞뒤 약 500m</option></select></label>
+            <label class="small"><input id="gpxSnapConfirm" type="checkbox"> 길 따라 결과를 항상 미리 보고 적용</label>
+          </details>
+        </div>
+        <div id="gpxPointCard" class="pcard" aria-live="polite"></div>
+        <div class="btns" id="gpxPreviewBar" hidden><button id="gpxApply" class="pri" disabled>미리보기 적용</button><button id="gpxCancel">미리보기 취소</button></div>
+        <p id="gpxStatus" role="status" class="hint"></p>
+        <p id="gpxHandleCount" class="hint small"></p>
+        <details id="gpxHelp"><summary>사용법 · 단축키</summary>
+          <ul class="keys">
+            <li>점 <b>클릭</b> 선택 · <b>끌기</b> 이동 · 선 <b>클릭</b> 점 추가 · <b>Shift+클릭</b> 구간 선택 · <b>우클릭</b> 메뉴</li>
+            <li><kbd>←</kbd> <kbd>→</kbd> 이전/다음 점 · <kbd>PgUp</kbd> <kbd>PgDn</kbd> 10점씩 · <kbd>Home</kbd> <kbd>End</kbd> 구간 처음/끝</li>
+            <li><kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 구간 늘이기 · <kbd>Delete</kbd> 삭제 · <kbd>+</kbd> 뒤에 점 추가 · <kbd>F</kbd> 선택 점 확대</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> 되돌리기 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 다시 실행 · <kbd>Enter</kbd> 미리보기 적용 · <kbd>Esc</kbd> 취소/선택 해제</li>
+            <li>휴대폰: 점을 눌러 고른 뒤 끌어 옮기세요. 고른 점 옆 <b>+</b>를 누르면 점이 추가됩니다. 구간은 <b>구간</b> 버튼을 누른 뒤 다른 끝 점을 누르세요.</li>
+            <li>지도 색: 회색 점선은 원본, 빨강은 수정본, 청록은 선택 구간, 주황은 적용 전 미리보기입니다. 속이 채워진 점은 수정한 점입니다.</li>
+            <li>옮기거나 추가한 점에는 원래의 시각·고도가 남지 않습니다. 원본 파일은 바뀌지 않습니다.</li>
+          </ul>
+        </details>
+        <details id="gpxAdvanced"><summary>상세 편집 · 내보내기 옵션</summary>
+        <label class="small">구간 <select id="gpxSegment" class="field"></select></label>
+        <div class="btns"><label>시작 점 <input id="gpxStart" type="number" min="1" value="1" style="width:75px"></label><label>끝 점 <input id="gpxEnd" type="number" min="1" value="2" style="width:75px"></label></div>
+        <div class="btns"><button id="gpxPickStart">지도에서 시작 선택</button><button id="gpxPickEnd">지도에서 끝 선택</button><button id="gpxMove">시작 점을 클릭 위치로</button><button id="gpxInsert">시작 뒤 클릭 위치에 추가</button><button id="gpxDelete">시작 점 삭제</button></div>
+        <div class="btns"><button id="gpxTrim">시작~끝만 남기기</button><button id="gpxRoute">시작~끝 길 따라 미리보기</button></div>
+        <p class="hint small">길 따라 다시 그리기는 양 끝점 2개만 경로 서버로 보냅니다(30km 이내). 대체 경로는 별도 구간으로 저장해 원본과의 틈을 임의 직선으로 잇지 않습니다.</p>
+        <label class="small"><input id="gpxStripTime" type="checkbox"> 내려받을 때 원본 시각 정보 제거</label>
+        </details>
+      </section>
+      <p id="cDrawHint" class="hint work">지도를 눌러 지점을 찍으세요. 점은 <b>끌어서</b> 옮기고, 선을 <b>누르면</b> 사이에 지점이 추가됩니다.</p>
+      <div class="seg work" id="connection"><button data-v="follow" class="on">길 따라 잇기</button><button data-v="straight">직선으로 잇기</button></div>
+      <p id="cRouteStatus" role="status" aria-live="polite" class="hint work"></p><button id="cRetry" class="work" hidden>경로 다시 계산</button>
+      <div class="stats work" id="cStats"></div>
+      <div class="seg work" id="mode"><button data-v="walk" class="on">걷기</button><button data-v="hike">등산</button><button data-v="bike">자전거</button></div>
+      <input id="cName" class="field work" placeholder="코스 이름" maxlength="60">
+      <div class="btns work" id="cEditRow">
+        <button id="cUndo" title="되돌리기 (Ctrl+Z)">↶ 되돌리기</button><button id="cDelete" title="고른 점을 지웁니다. 고른 점이 없으면 마지막 점 (Delete)">점 삭제</button>
+        <button id="cLoop">⟲ 출발점으로 닫기</button>
+        <button id="cClear">모두 지우기</button>
       </div>
-      <h2 id="courseTitle">코스 편집</h2>
-      <div class="btns" role="group" aria-label="편집 시작 또는 전환"><button id="editNew" class="pri" aria-pressed="true">새 코스 만들기</button><label id="editImport" class="btn" role="button" tabindex="0" aria-pressed="false">GPX 불러와 수정하기<input id="editGpxInput" type="file" accept=".gpx,application/gpx+xml" hidden></label></div>
-      <p id="editorMode" role="status" style="padding:8px;border-left:3px solid #2f5d50;background:#edf4ef;font-weight:600;overflow-wrap:anywhere">현재 새 코스 편집</p>
-      <p id="editorImportStatus" role="status" aria-live="polite" class="hint small" style="white-space:pre-wrap;overflow-wrap:anywhere">GPX를 선택하면 읽기 결과가 여기에 표시됩니다.</p>
-      <p id="editHint" class="hint small">새 코스와 GPX 수정본을 같은 지도에서 편집합니다. 원본 파일은 바뀌지 않습니다.</p>
+      <div class="btns work savebar">
+        <button id="cSave">이 브라우저에 저장</button>
+        <button id="cExport" class="pri">GPX 내려받기</button>
+      </div>
+      <div class="chartbox" id="cChartBox" hidden><canvas id="cChart" height="130"></canvas></div>
       <section id="traceTools" aria-label="이미지로 GPX 만들기">
-        <label id="traceStart" class="btn trace-start" role="button" tabindex="0">이미지로 GPX 만들기<small>경로가 그려진 지도 이미지를 겹쳐 선을 따라 GPX를 만듭니다 · 이미지는 서버로 보내지 않습니다</small><input id="traceFile" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
+        <label id="traceStart" class="trace-start" role="button" tabindex="0">지도 이미지에서 코스 따오기<small>경로가 그려진 지도 이미지를 겹쳐 선을 따라 GPX를 만듭니다. 이미지는 서버로 보내지 않습니다.</small><input id="traceFile" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
         <div id="traceAlign" class="trace-step" hidden>
           <div class="trace-h"><b>1 위치 맞추기</b><span id="tracePairInfo" class="badge">기준점 없음</span></div>
           <label class="small trace-range">투명도 <input id="traceOpacity" type="range" min="0" max="100" value="60"></label>
@@ -86,89 +132,61 @@
         <p id="traceStatus" role="status" aria-live="polite" class="hint small"></p>
         <div class="btns trace-closerow"><button id="traceClose" type="button">이미지 닫기</button></div>
       </section>
-      <section id="gpxTools" hidden>
-        <p class="gpx-quick">점 <b>클릭</b> 선택 · <b>끌기</b> 이동 · 선 <b>클릭</b> 점 추가 · <b>Shift+클릭</b> 범위 · <b>우클릭</b> 메뉴</p>
-        <div id="gpxPointCard" class="pcard" aria-live="polite"></div>
-        <div class="btns" id="gpxPreviewBar" hidden><button id="gpxApply" class="pri" disabled>미리보기 적용</button><button id="gpxCancel">미리보기 취소</button></div>
-        <p id="gpxStatus" role="status" class="hint"></p>
-        <div id="gpxSnapBox" class="snapbox" data-state="idle">
-          <div class="snaprow"><button id="gpxSnapToggle" type="button" role="switch" aria-checked="false" title="점 이동·추가 후 주변을 실제 길 따라 다시 그립니다">길 따라 보정 <b id="gpxSnapState">OFF</b></button>
-            <div class="seg" id="gpxSnapMode" role="group" aria-label="활동 유형"><button type="button" data-v="walk">걷기</button><button type="button" data-v="hike">등산</button><button type="button" data-v="bike">자전거</button></div></div>
-          <label class="small">보정 범위 <select id="gpxSnapWindow"><option value="100">앞뒤 약 100m</option><option value="180">앞뒤 약 180m</option><option value="300">앞뒤 약 300m</option><option value="500">앞뒤 약 500m</option></select></label>
-          <p id="gpxSnapStatus" role="status" aria-live="polite"></p>
-          <p id="gpxSnapDetail" class="hint small"></p>
-          <div class="btns" id="gpxSnapActions" hidden><button id="gpxSnapApply" type="button" class="pri" disabled>새 경로 적용</button><button id="gpxSnapCancel" type="button" disabled>취소</button><button id="gpxSnapRetry" type="button" disabled>다시 계산</button></div>
-        </div>
-        <label class="small">구간 <select id="gpxSegment" class="field"></select></label>
-        <p id="gpxHandleCount" class="hint small"></p>
-        <details id="gpxHelp"><summary>사용법 · 단축키</summary>
-          <ul class="keys">
-            <li><kbd>←</kbd> <kbd>→</kbd> 이전/다음 점 · <kbd>PgUp</kbd> <kbd>PgDn</kbd> 10점씩 · <kbd>Home</kbd> <kbd>End</kbd> 구간 처음/끝</li>
-            <li><kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 범위 늘이기 · <kbd>Shift</kbd>+클릭 범위 선택</li>
-            <li><kbd>Delete</kbd> 선택 점·범위 삭제 · <kbd>+</kbd> 뒤에 점 추가 · <kbd>F</kbd> 선택 점 확대</li>
-            <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> 되돌리기 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> 다시 실행 · <kbd>Enter</kbd> 미리보기 적용 · <kbd>Esc</kbd> 취소/선택 해제</li>
-            <li>모바일: 점을 눌러 선택하고 끌어 옮기세요. 선택 점 옆 <b>+</b>를 누르면 점이 추가됩니다. 범위는 <b>범위</b> 버튼 후 다른 끝 점을 누르세요.</li>
-            <li>지도 색: 회색 점선 원본 · 빨강 수정본 · 청록 선택 범위 · 주황 적용 전 미리보기. 테두리 초록 점은 구간 시작, 검정 점은 구간 끝, 채운 점은 수정한 점입니다.</li>
-          </ul>
-        </details>
-        <details id="gpxAdvanced"><summary>번호로 선택 · 범위 직접 입력</summary>
-        <div class="btns"><label>시작 점 <input id="gpxStart" type="number" min="1" value="1" style="width:75px"></label><label>끝 점 <input id="gpxEnd" type="number" min="1" value="2" style="width:75px"></label></div>
-        <div class="btns"><button id="gpxPickStart">지도에서 시작 선택</button><button id="gpxPickEnd">지도에서 끝 선택</button><button id="gpxMove">시작 점을 클릭 위치로</button><button id="gpxInsert">시작 뒤 클릭 위치에 추가</button><button id="gpxDelete">시작 점 삭제</button></div>
-        <div class="btns"><button id="gpxTrim">시작~끝만 남기기</button><button id="gpxRoute">시작~끝 길 따라 미리보기</button></div>
-        <p class="hint small">길 따라 다시 그리기는 현재 활동 유형 기준이며, 확인 후 양 끝점 2개만 길담 서버로 보냅니다(30km 이내). 대체 경로는 별도 구간으로 저장해 원본과의 틈을 임의 직선으로 잇지 않습니다.</p>
-        </details>
-        <label class="small"><input id="gpxStripTime" type="checkbox"> 내보낼 때 원본 시각 정보 제거</label>
-        <p class="hint small">수정·추가한 점에는 시각·고도·확장값이 없습니다. 원본 파일은 바뀌지 않습니다.</p>
-      </section>
-      <p id="cDrawHint" class="hint">지도를 눌러 지점을 추가하고, 점을 끌어 옮기세요. <span class="chip">길 따라 자동 연결</span> 지점 간격은 30km 이내로 찍으세요. 지점을 오른쪽 클릭하면 삭제합니다.</p>
-      <div class="seg" id="connection"><button data-v="follow" class="on">길 따라</button><button data-v="straight">직선 / GPX 원본</button></div>
-      <p id="cRouteHint" class="hint small">길 따라 모드에서는 찍은 경유점만 길담 서버로 보내 계산합니다. GPX 파일은 브라우저에서만 읽습니다. 지도에 없는 길·통제·위험구간은 반영되지 않을 수 있습니다.</p>
-      <p id="cRouteStatus" role="status" aria-live="polite" class="hint"></p><button id="cRetry">경로 다시 계산</button>
-      <div class="stats" id="cStats"></div>
-      <div class="seg" id="mode"><button data-v="walk" class="on">🚶 걷기 4km/h</button><button data-v="hike">🥾 등산 3km/h</button><button data-v="bike">🚲 자전거 15km/h</button></div>
-      <input id="cName" class="field" placeholder="코스 이름" maxlength="60">
-      <div class="btns" id="cEditRow">
-        <button id="cUndo">↶ 되돌리기</button><button id="cDelete">마지막 점 삭제</button>
-        <button id="cLoop">⟲ 출발점으로 닫기</button>
-        <button id="cClear">지우기</button>
-      </div>
-      <div class="btns">
-        <button id="cSave" class="pri">브라우저에 저장</button>
-        <button id="cExport" class="pri">GPX 내보내기</button>
-        <label class="btn">GPX 바꾸기<input type="file" id="cImport" accept=".gpx" hidden></label>
-      </div>
-      <div class="chartbox" id="cChartBox" hidden><canvas id="cChart" height="130"></canvas></div>
-      <p class="hint small" id="cEleHint">⛰ 고도는 지형 고도 데이터(DEM)에서 읽어요. 30m 해상도라 실제와 조금 다를 수 있어요.</p>
-      <h3>저장한 코스</h3>
+      <h3 id="savedTitle">저장한 코스</h3>
       <div id="saved" class="list"></div>
-      <p class="hint small">💾 코스는 이 브라우저(localStorage)에만 저장돼요. 로그인·서버 저장은 다음 버전에서요.</p>
     </section>
-    <footer class="foot">지도 데이터 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 기여자 · 경로 계산 <a href="https://brouter.de/brouter/" target="_blank" rel="noopener">BRouter</a> (MIT) · © <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> · <a href="https://www.nuni.co.kr" target="_blank" rel="noopener">nuni</a></footer>
+    <section data-pane="tracks" hidden>
+      <h2>기록 비교</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" multiple hidden>
+        <span class="dropicon">⬆</span>
+        <span><b>비교할 GPX 파일 선택</b><br><small>두 개 이상 올리면 지도에 겹쳐 보여요. 끌어다 놓아도 됩니다.</small></span>
+      </label>
+      <label class="stored-track" id="storedTrackLabel" hidden>이전에 불러온 GPX
+        <select id="storedTrack" class="field" aria-label="이전에 불러온 GPX 선택"></select>
+      </label>
+      <div id="trackList" class="list"></div>
+      <div class="chartbox" id="chartBox" hidden>
+        <div class="seg"><button data-m="ele" class="on">고도</button><button data-m="spd">속도</button></div>
+        <canvas id="chart" height="150"></canvas>
+      </div>
+      <div class="row small"><label><input type="checkbox" id="stripT" checked> 내려받을 때 시각 정보 지우기</label></div>
+    </section>
+    <footer class="foot">
+      <details><summary>파일과 개인정보는 어떻게 다루나요?</summary>
+        <ul>
+          <li>GPX 파일과 지도 이미지는 이 브라우저 안에서만 읽고 서버로 올리지 않습니다.</li>
+          <li>길 따라 잇기를 쓰면 찍은 지점(또는 옮긴 점과 앞뒤 기준점)의 좌표만 길담 경로 서버로 보냅니다.</li>
+          <li>저장한 코스는 이 브라우저에만 보관됩니다. 브라우저 데이터를 지우거나 기기를 바꾸면 사라지니, 남길 코스는 GPX로 내려받으세요.</li>
+          <li>고도는 30m 해상도 지형 자료에서 읽어 실제와 조금 다를 수 있습니다. 지도에 없는 길·통제 구간은 반영되지 않을 수 있습니다.</li>
+        </ul>
+      </details>
+      지도 데이터 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 기여자 · 경로 계산 <a href="https://brouter.de/brouter/" target="_blank" rel="noopener">BRouter</a> (MIT) · © <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> · <a href="https://www.nuni.co.kr" target="_blank" rel="noopener">nuni</a></footer>
   </aside>
   <button class="layers-btn" id="layersBtn" type="button" aria-expanded="false" aria-controls="layers">지도 설정</button>
   <div class="layers" id="layers" hidden>
     <div class="sseg" id="styleSeg" role="radiogroup" aria-label="지도 스타일"></div>
     <label class="tl"><input type="checkbox" id="lyPlaces" checked> 주요 건물·관광지·공원</label>
-    <small>확대하면 지도에 등록된 장소명이 표시됩니다.</small>
-    <p id="tourismStatus" class="hint small" style="max-width:220px">관광공사 보강 상태 확인 중…</p>
+    <p id="tourismStatus" class="hint small" hidden></p>
     <label class="tl"><input type="checkbox" id="lyHill" checked> 음영 기복</label>
     <label class="tl"><input type="checkbox" id="lyCont"> 등고선</label>
   </div>
   <div class="toast" id="toast" role="status"></div>
 </main>
 <script>
-window.addEventListener('load',function(){var n=document.getElementById('editorImportStatus');if(!n)return;if(!window.__gpxEditor&&n.textContent.indexOf('편집기 준비 오류:')!==0){n.textContent='GPX 편집기를 준비하지 못했습니다. Ctrl+F5로 새로고침해 주세요. 계속되면 이 화면을 보내 주세요.';n.style.color='#b42318';}else if(n.textContent==='GPX를 선택하면 읽기 결과가 여기에 표시됩니다.'){n.textContent='GPX 편집기 준비 완료 · 파일을 선택하면 읽기 결과가 여기에 계속 표시됩니다.';}});
-window.addEventListener('error',function(e){var file=e.filename||(e.target&&e.target.src)||'';if(!/(gpx-model|gpx-editor|app)\.js/.test(file))return;var n=document.getElementById('editorImportStatus');if(n){n.textContent='편집기 준비 오류: '+(e.message||'스크립트를 내려받지 못했습니다.')+' · Ctrl+F5 새로고침 후에도 같으면 이 문구를 보내 주세요.';n.style.color='#b42318';}},true);
+function editorLoadError(text){var n=document.getElementById('editorImportStatus');if(n){n.textContent=text;n.style.color='#b42318';}}
+window.addEventListener('load',function(){if(!window.__gpxEditor)editorLoadError('편집기를 준비하지 못했습니다. Ctrl+F5로 새로고침해 주세요. 계속되면 이 화면을 보내 주세요.');});
+window.addEventListener('error',function(e){var file=e.filename||(e.target&&e.target.src)||'';if(!/(gpx-model|gpx-editor|app)\.js/.test(file))return;editorLoadError('편집기 준비 오류: '+(e.message||'스크립트를 내려받지 못했습니다.')+' · Ctrl+F5 새로고침 후에도 같으면 이 문구를 보내 주세요.');},true);
 </script>
 <script src="vendor/maplibre-gl.js?v=10-gapfix1"></script>
 <script src="vendor/pmtiles.js?v=10-gapfix1"></script>
 <script src="vendor/basemaps.js?v=10-gapfix1"></script>
 <script src="vendor/maplibre-contour.js?v=10-gapfix1"></script>
-<script src="gpx-model.js?v=12-pointedit"></script>
-<script src="app.js?v=12-pointedit"></script>
-<script src="gpx-editor.js?v=12-pointedit"></script>
-<script src="trace-model.js?v=12-pointedit"></script>
-<script src="trace.js?v=12-pointedit"></script>
+<script src="gpx-model.js?v=13-studio"></script>
+<script src="app.js?v=13-studio"></script>
+<script src="gpx-editor.js?v=13-studio"></script>
+<script src="trace-model.js?v=13-studio"></script>
+<script src="trace.js?v=13-studio"></script>
 <script src="places.js?v=10-gapfix1"></script>
 </body>
 </html>

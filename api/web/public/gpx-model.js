@@ -44,6 +44,31 @@ function edit(segments,index,start,end,action,data){const seg=segments[index];if
  }else throw Error('지원하지 않는 편집입니다.');
  return segments.map((s,i)=>i===index?{...s,points}:s);
 }
+// Soft move: point p goes to coord; neighbours within radiusM along the path follow by a cosine-weighted share of the
+// same offset (1 at p → 0 at the radius). Never crosses a segment. Returns the changed index range and its new coordinates.
+function softShift(points,p,coord,radiusM){
+ if(!Array.isArray(points)||!Number.isInteger(p)||p<0||p>=points.length)throw Error('점 번호 범위를 확인하세요.');
+ const target=clonePoint(coord).c,o=points[p].c,dx=target[0]-o[0],dy=target[1]-o[1],R=Math.min(5000,Math.max(0,Number(radiusM)||0));
+ const left=[],right=[];
+ if(R>0)for(const [dir,out]of [[-1,left],[1,right]]){let along=0;for(let i=p+dir;i>=0&&i<points.length;i+=dir){along+=meters(points[i-dir].c,points[i].c);if(along>=R)break;const w=.5*(1+Math.cos(Math.PI*along/R));if(w<.01)break;out.push([points[i].c[0]+dx*w,points[i].c[1]+dy*w]);}}
+ return{lo:p-left.length,hi:p+right.length,coordinates:[...left.reverse(),[target[0],target[1]],...right]};
+}
+function softMove(segments,index,p,coord,radiusM){
+ const seg=segments[index];if(!seg)throw Error('구간을 선택하세요.');
+ const shift=softShift(seg.points,p,coord,radiusM),points=seg.points.slice();
+ shift.coordinates.forEach((c,k)=>{points[shift.lo+k]=clonePoint(c);});
+ return{segments:segments.map((s,i)=>i===index?{...s,points}:s),lo:shift.lo,hi:shift.hi,moved:shift.coordinates.length};
+}
+// Overlapping passes (out-and-back, repeated loops). `hits` are the on-screen points or edges near a click, in path order,
+// each {si,pi,d} with d = pixel distance. A new pass starts when the segment changes or more than `gap` indices were skipped;
+// every pass keeps its nearest hit.
+function groupPasses(hits,gap=8){const out=[];let last=null;for(const h of hits){if(last&&h.si===last.si&&h.pi-last.pi<=gap){if(h.d<out[out.length-1].d)out[out.length-1]=h;}else out.push(h);last=h;}return out;}
+// Among the passes about as close as the nearest one (within tol px), prefer the one that continues from the current
+// selection: same segment first, then the smallest index distance. Returns {hit, passes (path order)} or null.
+function pickPass(passes,selected,start,tol=6){if(!passes.length)return null;let min=Infinity;for(const h of passes)if(h.d<min)min=h.d;
+ const near=passes.filter(h=>h.d<=min+tol),key=h=>[h.si===selected?0:1,Math.abs(h.si-selected),h.si===selected?Math.abs(h.pi-start):0,h.d];
+ let hit=near[0],best=key(hit);for(const h of near.slice(1)){const k=key(h);for(let i=0;i<4;i++){if(k[i]===best[i])continue;if(k[i]<best[i]){hit=h;best=k;}break;}}
+ return{hit,passes:near};}
 function exportGpx(source,segments,{stripTimes=true}={}){
  const doc=source.doc.cloneNode(true);Array.from(doc.childNodes).filter(n=>n.nodeType===7).forEach(n=>doc.removeChild(n));const containers=Array.from(doc.getElementsByTagName('*')).filter(n=>n.namespaceURI===doc.documentElement.namespaceURI&&((n.localName==='trkseg'&&n.parentNode?.localName==='trk'&&n.parentNode.namespaceURI===doc.documentElement.namespaceURI)||(n.localName==='rte'&&n.parentNode===doc.documentElement)));
  containers.forEach((container,slot)=>{const tag=container.localName==='rte'?'rtept':'trkpt',parts=segments.filter(s=>s.slot===slot);const fragment=doc.createDocumentFragment();
@@ -132,5 +157,5 @@ function createRouter({fetch:fetchFn=(...a)=>globalThis.fetch(...a),endpoint='/r
 }
 // Legs are requested sequentially: the engine computes one route at a time.
 async function computeReroute(router,plan,mode,signal){const results=[];for(const l of plan.legs)results.push(await router.leg(l.from,l.to,mode,signal));return mergeLegs(results,plan);}
-root.GildamGpxModel={decode,parse,edit,exportGpx,restore,REROUTE,meters,planReroute,validateRoute,mergeLegs,applyReroute,createRouter,computeReroute};
+root.GildamGpxModel={decode,parse,edit,softShift,softMove,groupPasses,pickPass,exportGpx,restore,REROUTE,meters,planReroute,validateRoute,mergeLegs,applyReroute,createRouter,computeReroute};
 })(typeof window!=='undefined'?window:globalThis);

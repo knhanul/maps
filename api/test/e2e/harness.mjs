@@ -21,6 +21,8 @@ export const road = (a, b, off = 0.0003) => [[a[0], a[1], 1], [(a[0] + b[0]) / 2
 export async function launch() { return chromium.launch({ executablePath: process.env.CHROME, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] }); }
 export async function open(browser, viewport, mobile = false) {
   const ctx = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: mobile ? 2 : 1, acceptDownloads: true });
+  // These suites assert the single-point move and the preview-then-apply flow; the app default is now soft move + auto-apply.
+  await ctx.addInitScript(() => { try { localStorage.setItem("gildam.move.v1", '{"mode":"single","confirm":true}'); } catch {} });
   const page = await ctx.newPage(), errors = [], calls = [];
   page.on("pageerror", e => errors.push(e.message)); page.on("dialog", d => d.accept());
   let impl = async body => ({ status: 200, body: { coordinates: road(body.from, body.to) } });

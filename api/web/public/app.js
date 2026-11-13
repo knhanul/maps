@@ -1,4 +1,4 @@
-/* 길담 지도 웹 v1 — 모든 GPX 처리는 브라우저 안에서만. 서버 전송 없음. */
+/* 길담 스튜디오 웹 — GPX 파일은 브라우저 안에서만 처리. 길 따라 잇기를 쓸 때만 지점 좌표를 자체 경로 서버로 보냄. */
 (() => {
 "use strict";
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -97,8 +97,12 @@ async function initMap() {
   map.addSource("course", { type: "geojson", data: fc([]) });
   map.addLayer({ id: "course-casing", type: "line", source: "course", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#fff", "line-width": 8 } });
   map.addLayer({ id: "course", type: "line", source: "course", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#d2453b", "line-width": 4, "line-dasharray": [2, 1.2] } });
-  map.on("click", e => { if(tab==="course"&&window.__trace?.mapClick(e))return; if(tab==="course"&&window.__gpxEditor?.active){window.__gpxEditor.mapClick(e);return;} if(window.__openPlace?.(e))return; if (tab === "course") addPt([e.lngLat.lng, e.lngLat.lat]); });
-  renderTracks(); renderCourse();
+  map.on("click", e => { if(tab==="course"&&window.__trace?.mapClick(e))return; if(tab==="course"&&window.__gpxEditor?.active){window.__gpxEditor.mapClick(e);return;} if(window.__openPlace?.(e))return; if (tab !== "course" || courseStage() !== "new") return; const edge = lastPointer === "mouse" ? courseEdgeAt(e.point, 8) : null; if (edge) insertPt(edge.leg, [edge.at.lng, edge.at.lat]); else addPt([e.lngLat.lng, e.lngLat.lat]); });
+  map.getCanvas().addEventListener("pointerdown", e => { lastPointer = e.pointerType || "mouse"; }, { passive: true });
+  let hoverQueued = false, hoverEv = null;
+  map.on("mousemove", e => { hoverEv = e; if (hoverQueued) return; hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; courseHover(hoverEv); }); });
+  map.on("mouseout", hideCourseGhost);
+  renderTracks(); renderCourse(); updateStage();
   window.__map = map; window.__switchStyle = switchStyle; window.__elevAt = elevAt; window.__gildamReady = true; window.__gildamManifest = manifest; window.__applyPlaces?.(true);
 }
 const fc = f => ({ type: "FeatureCollection", features: f });
@@ -215,11 +219,11 @@ async function sampleCourse(P) {
 }
 
 /* ---------- tabs / panel ---------- */
-let tab = "tracks";
+let tab = "course", drawing = false, lastPointer = "mouse";
 $$(".tab").forEach(b => b.onclick = () => {
   tab = b.dataset.tab; $$(".tab").forEach(x => x.classList.toggle("active", x === b));
   $$("[data-pane]").forEach(s => s.hidden = s.dataset.pane !== tab);
-  if (map) map.getCanvas().style.cursor = tab === "course" ? "crosshair" : "";
+  hideCourseGhost(); updateStage();
   markers.forEach(m => m.getElement().style.display = tab === "course" ? "" : "none");window.__gpxEditor?.setVisible(tab==="course");window.__trace?.setVisible(tab==="course");
   $("#panel").classList.remove("min");
 });
@@ -245,9 +249,11 @@ async function addFiles(files) {
 }
 $("#gpxIn").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
 const drop = $("#drop");
-["dragenter", "dragover"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === "drop" || e.target === drop) drop.classList.remove("over"); }));
-document.addEventListener("drop", e => { const fs = [...(e.dataTransfer?.files || [])].filter(f => /\.gpx$/i.test(f.name)); if (fs.length) { if (tab === "course") importCourse(fs[0]); else addFiles(fs); } });
+let dragDepth = 0; const dragging = on => { drop.classList.toggle("over", on); document.body.classList.toggle("dragging", on); };
+document.addEventListener("dragenter", e => { e.preventDefault(); dragDepth++; dragging(true); });
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("dragleave", e => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; dragging(false); } });
+document.addEventListener("drop", e => { e.preventDefault(); dragDepth = 0; dragging(false); const fs = [...(e.dataTransfer?.files || [])].filter(f => /\.gpx$/i.test(f.name)); if (!fs.length) return; if (fs.length > 1 || tab === "tracks") { if (tab !== "tracks") $('.tab[data-tab="tracks"]').click(); addFiles(fs); } else importCourse(fs[0]); });
 
 async function selectStoredTrack(id) {
   const selected = tracks.find(t => t.id === id);
@@ -328,13 +334,51 @@ addEventListener("resize", () => { drawChart(); drawProfile(); });
 const initialDraft = store.get(LS_D, []);
 let course = Array.isArray(initialDraft) ? initialDraft : (initialDraft.waypoints || []), hist = [], markers = [], mode = initialDraft.mode || "walk";
 let follow = Array.isArray(initialDraft) ? course.length === 0 : !!initialDraft.follow;
-let geometry = [], routeState = "idle", routeSeq = 0, routeAbort = null;
+let geometry = [], legStart = [], routeState = "idle", routeSeq = 0, routeAbort = null, sel = -1, courseGhost = null;
+/* 화면 단계: start(시작 화면) → new(새 코스 그리기) / gpx(불러온 GPX 편집) */
+const coursePane = $('[data-pane="course"]');
+function courseStage() { return window.__gpxEditor?.active ? "gpx" : (course.length || drawing || $("#traceTools").classList.contains("has-image")) ? "new" : "start"; }
+function updateStage() {
+  const s = courseStage(); coursePane.dataset.stage = s;
+  if (map && !window.__gpxEditor?.active) map.getCanvas().style.cursor = tab === "course" && s === "new" ? "crosshair" : "";
+}
+new MutationObserver(() => updateStage()).observe($("#traceTools"), { attributes: true, attributeFilter: ["class"] });
+$("#editNew").addEventListener("click", () => { drawing = true; });
+$("#brand").onclick = () => { if (window.__gpxEditor?.active && !window.__gpxEditor.leave()) return; drawing = false; if (tab !== "course") $('.tab[data-tab="course"]').click(); renderCourse(); updateStage(); $("#panel").scrollTop = 0; };
+const markSel = () => markers.forEach(m => m.getElement().classList.toggle("sel", m._i === sel));
+function hideCourseGhost() { courseGhost?.remove(); courseGhost = null; }
+// 코스 선 위의 가장 가까운 위치와 그 위치가 속한 경유점 사이(leg) 번호
+function courseEdgeAt(point, limit) {
+  if (window.__gpxEditor?.active || course.length < 2) return null;
+  for (const p of course) { const q = map.project(p.slice(0, 2)); if (Math.hypot(q.x - point.x, q.y - point.y) < 14) return null; }
+  const pts = usableCourse(), hits = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = map.project(pts[i].slice(0, 2)), b = map.project(pts[i + 1].slice(0, 2)), dx = b.x - a.x, dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy || 1))), v = Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy);
+    if (v < limit) hits.push({ si: 0, pi: i, d: v, x: a.x + t * dx, y: a.y + t * dy });
+  }
+  if (!hits.length) return null;
+  const legOf = i => { let leg = i; if (follow) { leg = 0; while (leg + 1 < legStart.length && legStart[leg + 1] <= i) leg++; } return Math.min(leg, course.length - 2); };
+  // 왕복처럼 선이 겹친 곳: 고른 지점과 이어진 쪽(leg)을 우선한다.
+  const passes = window.GildamGpxModel.groupPasses(hits, follow ? 8 : 0), min = Math.min(...passes.map(h => h.d));
+  const far = h => { const leg = legOf(h.pi); return sel < 0 ? 0 : Math.min(Math.abs(leg - sel), Math.abs(leg + 1 - sel)); };
+  const best = passes.filter(h => h.d <= min + 6).reduce((a, h) => far(h) < far(a) || (far(h) === far(a) && h.d < a.d) ? h : a);
+  return { leg: legOf(best.pi), at: map.unproject([best.x, best.y]) };
+}
+function courseHover(e) {
+  const edge = e && tab === "course" && courseStage() === "new" && lastPointer === "mouse" ? courseEdgeAt(e.point, 8) : null;
+  if (!edge) { if (courseGhost) { hideCourseGhost(); updateStage(); } return; }
+  map.getCanvas().style.cursor = "copy";
+  if (!courseGhost) { const el = document.createElement("div"); el.className = "gpx-ghost"; el.textContent = "+"; courseGhost = new maplibregl.Marker({ element: el }).setLngLat(edge.at).addTo(map); } else courseGhost.setLngLat(edge.at);
+}
+function insertPt(leg, c) { hideCourseGhost(); snap(); course.splice(leg + 1, 0, [c[0], c[1], null]); sel = leg + 1; renderCourse(); }
 const routeCache = new Map();
 const usableCourse = () => window.__gpxEditor?.active ? window.__gpxEditor.selectedGeometry() : !follow || routeState === "ready" ? (follow ? geometry : course) : [];
 function routeUi(message) {
   $("#cRouteStatus").textContent = message;
   $("#cRouteStatus").style.color = routeState === "error" ? "#b42318" : "";
   $("#cExport").disabled = $("#cSave").disabled = follow && course.length > 1 && routeState !== "ready";
+  $("#cRetry").hidden = routeState !== "error";
   $$("#connection button").forEach(b => b.classList.toggle("on", (b.dataset.v === "follow") === follow));
   $$("#mode button").forEach(b => b.classList.toggle("on", b.dataset.v === mode));
 }
@@ -348,15 +392,15 @@ async function solveCourse() {
   ++profSeq; clearTimeout(profT); prof = null; $("#cChartBox").hidden = true;
   if (!follow || course.length < 2) {
     geometry = []; routeState = "idle"; drawCourseGeometry();
-    routeUi(follow ? "지점을 두 개 이상 찍으면 길을 따라 연결합니다." : "직선 모드 · 가져온 GPX는 서버로 보내지 않습니다.");
+    legStart = []; routeUi(course.length < 2 ? (course.length ? "다음 지점을 찍으면 선으로 이어집니다." : "지도를 눌러 출발 지점을 찍으세요.") : "");
     courseStats(); scheduleProfile(); return;
   }
-  if (course.length > 100) { routeState="error"; geometry=[]; drawCourseGeometry(); routeUi("길 따라 모드는 경유점 100개까지 지원합니다. GPX는 직선 모드에서 유지하세요."); courseStats(); return; }
+  if (course.length > 100) { routeState="error"; geometry=[]; drawCourseGeometry(); routeUi("길 따라 잇기는 지점 100개까지 됩니다. 지점을 줄이거나 직선으로 이어 주세요."); courseStats(); return; }
   routeState = "pending"; geometry = []; drawCourseGeometry(); courseStats();
-  routeUi("길을 찾는 중… · 경유점만 길담 서버에 전송합니다.");
+  routeUi("길을 찾는 중…");
   const points = course.map(p=>p.slice(0,2)), selectedMode = mode;
   try {
-    const solved=[];
+    const solved=[], starts=[];
     for (let i=1; i<points.length; i++) {
       const key=JSON.stringify([selectedMode,points[i-1],points[i]]);let part=routeCache.get(key);
       if (!part) {
@@ -378,23 +422,26 @@ async function solveCourse() {
         const a=solved.at(-1),b=part[0];
         if(Math.abs(a[0]-b[0])>0.00001||Math.abs(a[1]-b[1])>0.00001)throw Error("경유점이 서로 다른 길에 연결됐습니다. 경유점을 교차로나 길 위로 옮겨 주세요.");
       }
+      starts.push(Math.max(0,solved.length-1));
       solved.push(...(solved.length?part.slice(1):part));
     }
-    if(seq!==routeSeq)return;geometry=solved;routeState="ready";
-    routeUi("길 따라 연결됨 · OSM/BRouter · 실제 통행 가능 여부는 현장에서 확인하세요.");
+    if(seq!==routeSeq)return;geometry=solved;legStart=starts;routeState="ready";
+    routeUi("");
   } catch(e) {
     if(seq!==routeSeq||e.name==="AbortError")return;
-    routeState="error";geometry=[];routeUi((e.message && !e.message.includes("fetch") ? e.message : "서버 연결에 실패했습니다. 다시 시도하세요.")+" · 저장/GPX 내보내기를 중지했습니다.");
+    routeState="error";geometry=[];routeUi((e.message && !e.message.includes("fetch") ? e.message : "서버 연결에 실패했습니다. 다시 시도하세요.")+" · 지점을 옮기거나 다시 계산해 주세요.");
   }
   drawCourseGeometry();courseStats();scheduleProfile();
 }
-$("#connection").addEventListener("click", e => {const v=e.target.dataset.v;if(window.__gpxEditor?.active){toast("GPX는 선택한 부분만 길 따라로 바꿀 수 있습니다.");return;}if(!v||(v==="follow")===follow)return;if(v==="follow"&&!follow&&course.length>1&&!confirm("현재 점들을 길 따라 재계산할까요? 점 좌표가 길담 서버로 전송됩니다. 가져온 GPX 원본 파일은 전송하지 않습니다."))return;snap();follow=v==="follow";renderCourse();});
+$("#connection").addEventListener("click", e => {const v=e.target.dataset.v;if(window.__gpxEditor?.active){toast("GPX는 선택한 부분만 길 따라로 바꿀 수 있습니다.");return;}if(!v||(v==="follow")===follow)return;snap();follow=v==="follow";renderCourse();});
 $("#cRetry").onclick=()=>solveCourse();
-$("#cDelete").onclick=()=>{if(!course.length)return;snap();course.pop();renderCourse();};
+$("#cDelete").onclick=()=>{if(!course.length)return;snap();if(sel>=0&&sel<course.length)course.splice(sel,1);else course.pop();sel=-1;renderCourse();};
 const snap = () => { hist.push(JSON.stringify({course,follow,mode})); if (hist.length > 100) hist.shift(); };
-function addPt(c) { if(window.__gpxEditor?.active)return; snap(); course.push([c[0], c[1], null]); renderCourse(); }
+function addPt(c) { if(window.__gpxEditor?.active)return; snap(); course.push([c[0], c[1], null]); sel = course.length - 1; renderCourse(); }
 function renderCourse() {
+  updateStage();
   if(window.__gpxEditor?.active){window.__gpxEditor.render();return;}
+  if (sel >= course.length) sel = -1;
   store.set(LS_D, {waypoints:course, follow, mode});
   if (!map || !map.getSource("course")) return;
   drawCourseGeometry();
@@ -402,13 +449,13 @@ function renderCourse() {
   const many = course.length > 60;
   course.forEach((p, i) => {
     if (many && i % Math.ceil(course.length / 60) && i !== course.length - 1) return;
-    const el = document.createElement("div"); el.className = "cpt" + (i === 0 ? " first" : ""); el.title = i === 0 ? "출발" : `${i + 1}번 지점`;
-    const m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([p[0], p[1]]).addTo(map);
-    m.on("dragstart", () => {snap(); ++routeSeq; routeAbort?.abort(); ++profSeq; prof=null; if(follow){routeState="pending";geometry=[];routeUi("지점 이동 중…");drawCourseGeometry();}}); m.on("drag", () => {const l=m.getLngLat();course[i]=[l.lng,l.lat,null];drawCourseGeometry();courseStats();});
+    const el = document.createElement("div"); el.className = "cpt" + (i === 0 ? " first" : "") + (i === sel ? " sel" : ""); el.title = i === 0 ? "출발" : `${i + 1}번 지점`;
+    const m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([p[0], p[1]]).addTo(map); m._i = i;
+    m.on("dragstart", () => {sel = i; markSel(); hideCourseGhost(); snap(); ++routeSeq; routeAbort?.abort(); ++profSeq; prof=null; if(follow){routeState="pending";geometry=[];routeUi("지점 이동 중…");drawCourseGeometry();}}); m.on("drag", () => {const l=m.getLngLat();course[i]=[l.lng,l.lat,null];drawCourseGeometry();courseStats();});
     m.on("dragend", () => renderCourse());
-    el.addEventListener("click", ev => ev.stopPropagation());
-    el.addEventListener("contextmenu", ev => { ev.preventDefault(); ev.stopPropagation(); snap(); course.splice(i,1); renderCourse(); });
-    el.title += " · 오른쪽 클릭으로 삭제";
+    el.addEventListener("click", ev => { ev.stopPropagation(); sel = sel === i ? -1 : i; markSel(); });
+    el.addEventListener("contextmenu", ev => { ev.preventDefault(); ev.stopPropagation(); snap(); course.splice(i,1); sel = -1; renderCourse(); });
+    el.title += " · 눌러서 선택, 끌어서 이동, Delete로 삭제";
     if (tab !== "course") el.style.display = "none";
     markers.push(m);
   });
@@ -455,35 +502,45 @@ $("#cChart").addEventListener("pointermove", e => {
 $("#cChart").addEventListener("click", e => {
   if (!prof || !window.__gpxEditor?.active) return; const r = e.target.getBoundingClientRect(), d = (e.clientX - r.left - 38) / (r.width - 46) * prof.S.at(-1)[0];
   let best = prof.S[0]; for (const p of prof.S) if (Math.abs(p[0] - d) < Math.abs(best[0] - d)) best = p;
-  window.__gpxEditor.selectNear(best[2]);
+  window.__gpxEditor.selectAt(best[0]);
 });
 $("#cChart").addEventListener("pointerleave", () => map && map.getSource("hover").setData(fc([])));
 $$("#mode button").forEach(b => b.onclick = () => { if(mode===b.dataset.v)return;if(!window.__gpxEditor?.active)snap();mode = b.dataset.v; $$("#mode button").forEach(x => x.classList.toggle("on", x === b)); renderCourse(); });
-$("#cUndo").onclick = () => { if (!hist.length) return toast("되돌릴 게 없어요"); const previous=JSON.parse(hist.pop());course=previous.course;follow=previous.follow;mode=previous.mode;renderCourse(); };
-$("#cClear").onclick = () => { if (!course.length) return; snap(); course = []; renderCourse(); toast("코스를 지웠어요 (되돌리기 가능)"); };
+$("#cUndo").onclick = () => { if (!hist.length) return toast("되돌릴 게 없어요"); const previous=JSON.parse(hist.pop());course=previous.course;follow=previous.follow;mode=previous.mode;sel=-1;renderCourse(); };
+$("#cClear").onclick = () => { if (!course.length) return; snap(); course = []; sel = -1; drawing = true; renderCourse(); toast("코스를 지웠어요 (되돌리기 가능)"); };
 $("#cLoop").onclick = () => { if (course.length < 2) return toast("지점이 2개 이상 필요해요"); const a = course[0], b = course[course.length - 1]; if (a[0] === b[0] && a[1] === b[1]) return toast("이미 닫힌 코스예요"); snap(); course.push([a[0], a[1], a[2]]); renderCourse(); };
 const cname = () => $("#cName").value.trim() || `길담 코스 ${new Date().toLocaleDateString("ko-KR")}`;
 $("#cExport").onclick = () => { if(follow&&routeState!=="ready")return toast("경로 연결을 먼저 완료하세요"); if (course.length < 2) return toast("지점이 2개 이상 필요해요"); download(cname(), toGpx(cname(), usableCourse().map(p => [p[0], p[1], p[2], null]), { strip: true })); toast("GPX를 내려받았어요"); };
 async function importCourse(f) { if(!window.__gpxEditor){toast("GPX 편집기를 불러오지 못했습니다. 새로고침 후 다시 시도하세요. 기존 경로는 유지했습니다.");return;}return window.__gpxEditor.importFile(f); }
-$("#cImport").onchange = e => { if (e.target.files[0]) importCourse(e.target.files[0]); e.target.value = ""; };
+// 새 코스 단축키 (GPX 편집 중에는 gpx-editor.js가 처리)
+document.addEventListener("keydown", e => {
+  if (tab !== "course" || courseStage() !== "new" || e.defaultPrevented || e.altKey) return;
+  const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && (e.key === "z" || e.key === "Z")) $("#cUndo").click();
+  else if (!mod && (e.key === "Delete" || e.key === "Backspace") && sel >= 0) $("#cDelete").click();
+  else if (!mod && e.key === "Escape" && sel >= 0) { sel = -1; markSel(); }
+  else return;
+  e.preventDefault();
+});
 let saved = store.get(LS_C, []);
 function renderSaved() {
-  const L = $("#saved"); L.innerHTML = saved.length ? "" : `<div class="empty">저장한 코스가 없어요</div>`;
+  const L = $("#saved"); L.innerHTML = ""; $("#savedTitle").hidden = !saved.length;
   saved.forEach((c, i) => {
     const d = document.createElement("div"); d.className = "card";
     d.innerHTML = `<div class="hd"><span class="nm">${esc(c.name)}</span><small style="color:#66706a">${fmtKm(c.gpxEdit ? c.distance : stats(c.pts.map(p => [p[0], p[1], p[2], null])).dist)}</small><button class="ib" data-a="open">열기</button><button class="ib" data-a="del">✕</button></div>`;
-    d.onclick = e => { const a = e.target.dataset.a; if (a === "open") { if(c.gpxEdit){window.__gpxEditor?.restore(c);return;}if(window.__gpxEditor?.active){if(!window.__gpxEditor.leave())return;}else if(course.length&&!confirm("현재 코스가 저장되지 않았을 수 있습니다. 저장한 코스를 열까요?"))return; snap(); follow=!!c.follow;mode=c.mode||"walk";course=(c.waypoints||c.pts).map(p=>[...p]); $("#cName").value = c.name; renderCourse(); fit(course); } if (a === "del") { saved.splice(i, 1); store.set(LS_C, saved); renderSaved(); } };
+    d.onclick = e => { const a = e.target.dataset.a; if (a === "open") { if(c.gpxEdit){window.__gpxEditor?.restore(c);return;}if(window.__gpxEditor?.active){if(!window.__gpxEditor.leave())return;}else if(course.length&&!confirm("현재 코스가 저장되지 않았을 수 있습니다. 저장한 코스를 열까요?"))return; snap(); sel=-1; follow=!!c.follow;mode=c.mode||"walk";course=(c.waypoints||c.pts).map(p=>[...p]); $("#cName").value = c.name; renderCourse(); fit(course); } if (a === "del") { if (!confirm(`저장한 코스 "${c.name}"을(를) 지울까요?`)) return; saved.splice(i, 1); store.set(LS_C, saved); renderSaved(); } };
     L.appendChild(d);
   });
 }
 $("#cSave").onclick = () => { if(follow&&routeState!=="ready")return toast("경로 연결을 먼저 완료하세요"); if (course.length < 2) return toast("지점이 2개 이상 필요해요"); const n = cname(), k = saved.findIndex(c => c.name === n); const item = { name: n, pts: usableCourse(), waypoints: course, follow, mode, at: Date.now() }; if (k >= 0) saved[k] = item; else saved.unshift(item); if (store.set(LS_C, saved)) { renderSaved(); toast("이 브라우저에 저장했어요"); } };
 
 window.__courseBridge={refreshTracks:renderTracks,map:()=>map,toast,fit,download,stats,fmtKm,mode:()=>mode,inCourse:()=>tab==="course",hasWork:()=>course.length>0,
-  selectTab:()=> $$(".tab")[1].click(),
+  selectTab:()=> $('.tab[data-tab="course"]').click(), stage:()=>updateStage(),
   invalidate:()=>{++routeSeq;routeAbort?.abort();++profSeq;clearTimeout(profT);prof=null;$("#cChartBox").hidden=true;},
   removeMarkers:()=>{markers.forEach(m=>m.remove());markers=[];},
   profile:()=>{++profSeq;prof=null;$("#cChartBox").hidden=true;scheduleProfile();},
-  newCourse:()=>{course=[];hist=[];follow=true;routeState="idle";geometry=[];$("#cName").value="";renderCourse();},
+  newCourse:()=>{course=[];hist=[];sel=-1;follow=true;routeState="idle";geometry=[];$("#cName").value="";renderCourse();},
   resume:()=>renderCourse(),
   save:item=>{const k=saved.findIndex(c=>c.name===item.name);if(k>=0&&!confirm("같은 이름의 브라우저 저장본을 바꿀까요? 원본 파일은 바뀌지 않습니다."))return false;const next=saved.slice();if(k>=0)next[k]=item;else next.unshift(item);if(!store.set(LS_C,next))return false;saved=next;renderSaved();return true;}};
 renderTracks(); renderSaved(); courseStats();

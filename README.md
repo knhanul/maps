@@ -1,4 +1,6 @@
-# 길담 지도 WEB 소스
+# 길담 스튜디오 WEB 소스
+
+길담 앱은 길을 **기록**하는 앱이고, 길담 스튜디오(이 저장소)는 기록한 GPX를 **고치고 새 코스를 그리는** 웹입니다. 화면 개편 내용은 `api/editor-docs/README-editor.md`의 v13-studio 절을 보세요.
 
 https://maps.nuni.co.kr 운영 서버의 소스 스냅샷입니다. WEB `v10-gapfix1` 운영 스냅샷에 `v12-pointedit`(점 단위 편집 개편·길 따라 보정, 미배포) 변경을 더한 상태이며 Android 앱 저장소는 아닙니다. 기존 PUBLIC 저장소의 공개 범위는 변경하지 않았습니다.
 
