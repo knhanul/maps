@@ -73,9 +73,10 @@ Caddy(`caddy:2`, 80/443)가 TLS를 종료합니다. 설정은 `/srv/caddy/conf/p
 | 파일 | 권한 | 들어가는 키 이름 | 용도 |
 |---|---|---|---|
 | `/srv/gildam-api/.env` | root, 600 | `WORKER_TOKEN_SHA256` | API가 워커 토큰의 SHA-256만 보관 |
+| `/srv/gildam-api/.env` | root, 600 | `KAKAO_REST_API_KEY` | 장소 검색이 카카오 로컬 키워드 API를 대신 호출할 때 사용. 없으면 검색만 거절. git 제외 |
 | `/srv/gildam-api/map-worker.env` | root, 600 | `GILDAM_WORKER_TOKEN` | 워커가 쓰는 원문 토큰. git 제외 |
 
-프론트엔드만 바꿀 때는 이 파일을 열 필요도 없습니다. 백업할 때는 `sudo cp`로 복사만 하고 `cat`·`echo`로 내용을 보지 마세요. compose의 `OIDC_ISSUER`, `JWKS_URL`, `ADMIN_CLIENT_ID` 같은 공개 설정은 `docker-compose.yml`에 있고, 비밀값은 아닙니다.
+프론트엔드만 바꿀 때는 이 파일을 열 필요도 없습니다. 백업할 때는 `sudo cp`로 복사만 하고 `cat`·`echo`로 내용을 보지 마세요. `.env`에 키를 넣거나 바꾸면 `/srv/gildam-api`에서 `sudo APP_REV=<현재태그> docker compose up -d --no-deps --no-build --force-recreate gildam-api`로 **API만** 재생성해 `env_file`을 다시 읽게 하세요. 값은 명령줄·로그에 넣지 마세요. compose의 `OIDC_ISSUER`, `JWKS_URL`, `ADMIN_CLIENT_ID` 같은 공개 설정은 `docker-compose.yml`에 있고, 비밀값은 아닙니다.
 
 `web/public/vendor/`와 지도 PMTiles는 이 저장소에 없습니다. 운영 서버의 기존 파일을 지우거나 덮어쓰지 마세요.
 
