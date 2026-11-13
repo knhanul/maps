@@ -345,6 +345,15 @@ function updateStage() {
 new MutationObserver(() => updateStage()).observe($("#traceTools"), { attributes: true, attributeFilter: ["class"] });
 $("#editNew").addEventListener("click", () => { drawing = true; });
 $("#brand").onclick = () => { if (window.__gpxEditor?.active && !window.__gpxEditor.leave()) return; drawing = false; if (tab !== "course") $('.tab[data-tab="course"]').click(); renderCourse(); updateStage(); $("#panel").scrollTop = 0; };
+/* 점 이동 방식: soft(기본) = 끈 지점 주변 지점도 함께, single = 이 지점만. GPX 편집기와 같은 저장값(gildam.move.v1)을 쓴다. */
+const MOVE_KEY = "gildam.move.v1", movePrefs = () => store.get(MOVE_KEY, {});
+const courseSoft = () => movePrefs().mode !== "single";
+const softPxPref = () => [40, 80, 160].includes(movePrefs().softPx) ? movePrefs().softPx : 80;
+// 화면 기준 약 softPx 픽셀을 미터로 환산: 확대할수록 좁은 범위만 함께 움직임
+function softRadiusAt(c) { const q = map.project([c[0], c[1]]), a = map.unproject([q.x, q.y]), b = map.unproject([q.x + 100, q.y]); return hav([a.lng, a.lat], [b.lng, b.lat]) / 100 * softPxPref(); }
+function syncMoveUi() { const soft = courseSoft(); $$("#cMoveMode button").forEach(b => { const on = (b.dataset.v === "soft") === soft; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }); }
+$("#cMoveMode").addEventListener("click", e => { const v = e.target.dataset.v; if (!v) return; store.set(MOVE_KEY, { ...movePrefs(), mode: v }); syncMoveUi(); });
+syncMoveUi();
 const markSel = () => markers.forEach(m => m.getElement().classList.toggle("sel", m._i === sel));
 function hideCourseGhost() { courseGhost?.remove(); courseGhost = null; }
 // 코스 선 위의 가장 가까운 위치와 그 위치가 속한 경유점 사이(leg) 번호
@@ -451,7 +460,16 @@ function renderCourse() {
     if (many && i % Math.ceil(course.length / 60) && i !== course.length - 1) return;
     const el = document.createElement("div"); el.className = "cpt" + (i === 0 ? " first" : "") + (i === sel ? " sel" : ""); el.title = i === 0 ? "출발" : `${i + 1}번 지점`;
     const m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([p[0], p[1]]).addTo(map); m._i = i;
-    m.on("dragstart", () => {sel = i; markSel(); hideCourseGhost(); snap(); ++routeSeq; routeAbort?.abort(); ++profSeq; prof=null; if(follow){routeState="pending";geometry=[];routeUi("지점 이동 중…");drawCourseGeometry();}}); m.on("drag", () => {const l=m.getLngLat();course[i]=[l.lng,l.lat,null];drawCourseGeometry();courseStats();});
+    let softDrag = null;
+    m.on("dragstart", () => {sel = i; markSel(); hideCourseGhost(); snap(); ++routeSeq; routeAbort?.abort(); ++profSeq; prof=null; softDrag = courseSoft() && course.length > 1 ? { orig: course.map(p => ({ c: p.slice() })), radius: softRadiusAt(course[i]) } : null; if(follow){routeState="pending";geometry=[];routeUi("지점 이동 중…");drawCourseGeometry();}});
+    m.on("drag", () => {
+      const l = m.getLngLat();
+      if (softDrag) { // 끈 지점 주변 지점이 거리에 따라 함께 움직임 (GPX 편집과 같은 계산)
+        const sh = window.GildamGpxModel.softShift(softDrag.orig, i, [l.lng, l.lat], softDrag.radius);
+        sh.coordinates.forEach((c, k) => { const j = sh.lo + k; course[j] = [c[0], c[1], null]; if (j !== i) markers.find(x => x._i === j)?.setLngLat(c); });
+      } else course[i] = [l.lng, l.lat, null];
+      drawCourseGeometry(); courseStats();
+    });
     m.on("dragend", () => renderCourse());
     el.addEventListener("click", ev => { ev.stopPropagation(); sel = sel === i ? -1 : i; markSel(); });
     el.addEventListener("contextmenu", ev => { ev.preventDefault(); ev.stopPropagation(); snap(); course.splice(i,1); sel = -1; renderCourse(); });

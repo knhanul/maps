@@ -87,3 +87,4 @@ body.dragging .dropveil{display:grid}
 .layers-btn{position:absolute;top:150px;right:10px;z-index:2;border:0;background:#fff;border-radius:10px;box-shadow:0 2px 8px #0002;padding:8px 10px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--tx)}
 .layers:not(.open){display:none!important}
 @media (max-width:720px){.savebar{bottom:-16px}.dropveil{font-size:16px}}
+[data-stage=gpx] #cMoveMode{display:none}
