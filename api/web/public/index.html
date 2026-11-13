@@ -7,7 +7,7 @@
 <meta name="description" content="길담 스튜디오 — GPX 코스를 지도에서 고치고, 새로 그리고, 겹쳐 비교하세요. 파일은 서버로 올라가지 않아요.">
 <meta name="theme-color" content="#2f5d50">
 <link rel="stylesheet" href="vendor/maplibre-gl.css?v=10-gapfix1">
-<link rel="stylesheet" href="app.css?v=13-newsoft">
+<link rel="stylesheet" href="app.css?v=14-placesearch">
 <link rel="stylesheet" href="editor.css?v=13-newsoft">
 </head>
 <body>
@@ -27,6 +27,22 @@
     <button id="gpxPointPrev" type="button" title="이전 점 (←)" aria-label="이전 점">◀</button><button id="gpxPointLabel" type="button" class="dock-label" title="선택 점으로 이동 (F)">–</button><button id="gpxPointNext" type="button" title="다음 점 (→)" aria-label="다음 점">▶</button>
     <span class="dock-sep" aria-hidden="true"></span>
     <button id="gpxAddPoint" type="button" title="선택 점 뒤에 점 추가 (+)" aria-label="점 추가">＋</button><button id="gpxDeletePoint" type="button" title="선택 점·구간 삭제 (Delete)">삭제</button><button id="gpxRangeArm" type="button" aria-pressed="false" title="구간 선택: 누른 뒤 다른 끝 점을 선택 (PC: Shift+클릭)">구간</button>
+  </div>
+  <div class="place-search" id="placeSearch">
+    <form class="place-card" id="placeForm" role="search">
+      <div class="place-row">
+        <input id="placeQ" type="search" autocomplete="off" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="placeMenu" placeholder="장소, 주소, 산/공원 검색 ( / 또는 Ctrl+K )">
+        <button id="placeClear" type="button" hidden aria-label="검색어 지우기">✕</button>
+        <button id="placeKey" type="button" aria-label="카카오 REST 키" title="카카오 REST 키">키</button>
+      </div>
+      <label class="place-view"><input id="placeInView" type="checkbox"> 현 지도 내 검색</label>
+    </form>
+    <div class="place-key" id="placeKeyBox" hidden>
+      <p>카카오 로컬 REST 키. 이 브라우저에만 저장되고 검색 요청만 서버를 거칩니다. 서버에 키가 있으면 그 키가 우선입니다.</p>
+      <input id="placeKeyInput" type="password" autocomplete="off" placeholder="REST API 키" maxlength="128">
+      <div class="btns"><button id="placeKeySave" type="button" class="pri">저장</button><button id="placeKeyClear" type="button">키 지우기</button></div>
+    </div>
+    <div class="place-menu" id="placeMenu" hidden role="listbox"></div>
   </div>
   <div class="dropveil" aria-hidden="true"><span>여기에 GPX 파일을 놓으세요</span></div>
   <aside class="panel" id="panel">
@@ -157,7 +173,7 @@
       <details><summary>파일과 개인정보는 어떻게 다루나요?</summary>
         <ul>
           <li>GPX 파일과 지도 이미지는 이 브라우저 안에서만 읽고 서버로 올리지 않습니다.</li>
-          <li>길 따라 잇기를 쓰면 찍은 지점(또는 옮긴 점과 앞뒤 기준점)의 좌표만 길담 경로 서버로 보냅니다.</li>
+          <li>장소 검색을 쓰면 검색어와, 지도 안 검색일 때는 화면 범위만 카카오 로컬로 전달됩니다. GPX는 올라가지 않습니다.</li>
           <li>저장한 코스는 이 브라우저에만 보관됩니다. 브라우저 데이터를 지우거나 기기를 바꾸면 사라지니, 남길 코스는 GPX로 내려받으세요.</li>
           <li>고도는 30m 해상도 지형 자료에서 읽어 실제와 조금 다를 수 있습니다. 지도에 없는 길·통제 구간은 반영되지 않을 수 있습니다.</li>
         </ul>
@@ -184,10 +200,11 @@ window.addEventListener('error',function(e){var file=e.filename||(e.target&&e.ta
 <script src="vendor/basemaps.js?v=10-gapfix1"></script>
 <script src="vendor/maplibre-contour.js?v=10-gapfix1"></script>
 <script src="gpx-model.js?v=13-newsoft"></script>
-<script src="app.js?v=13-newsoft"></script>
+<script src="app.js?v=14-placesearch"></script>
 <script src="gpx-editor.js?v=13-newsoft"></script>
 <script src="trace-model.js?v=13-newsoft"></script>
 <script src="trace.js?v=13-newsoft"></script>
 <script src="places.js?v=10-gapfix1"></script>
+<script src="place-search.js?v=14-placesearch"></script>
 </body>
 </html>

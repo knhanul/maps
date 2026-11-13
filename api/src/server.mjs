@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createMaps } from "./maps.mjs";
+import { handlePlacesSearch } from "./places-search.mjs";
 
 const CFG = {
   port: Number(process.env.PORT || 8080),
@@ -169,6 +170,7 @@ const server = http.createServer(async (req, res) => {
     let path = u.pathname;
     if (CFG.basePath && path.startsWith(CFG.basePath)) path = path.slice(CFG.basePath.length) || "/";
     if (path === "/healthz") return send(res, 200, { ok: true });
+    if (path === "/places/search") return handlePlacesSearch(req, res, u, send);
     if (await maps.handle(req, res, path, u)) return;
     if (!path.startsWith("/v1/")) return send(res, 404, { error: "not_found" });
 

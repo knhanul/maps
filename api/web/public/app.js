@@ -559,6 +559,13 @@ window.__courseBridge={refreshTracks:renderTracks,map:()=>map,toast,fit,download
   removeMarkers:()=>{markers.forEach(m=>m.remove());markers=[];},
   profile:()=>{++profSeq;prof=null;$("#cChartBox").hidden=true;scheduleProfile();},
   newCourse:()=>{course=[];hist=[];sel=-1;follow=true;routeState="idle";geometry=[];$("#cName").value="";renderCourse();},
+  addPlacePoint:(lon,lat,label)=>{
+    if(window.__gpxEditor?.active){toast("불러온 GPX에는 넣지 않아요. 새 코스 그리기에서 추가해 주세요.");return false;}
+    if(tab!=="course")$('.tab[data-tab="course"]').click();
+    drawing=true;addPt([lon,lat,null]);
+    toast(label?`${label} 지점을 코스에 넣었어요`:"지점을 코스에 넣었어요");
+    return true;
+  },
   resume:()=>renderCourse(),
   save:item=>{const k=saved.findIndex(c=>c.name===item.name);if(k>=0&&!confirm("같은 이름의 브라우저 저장본을 바꿀까요? 원본 파일은 바뀌지 않습니다."))return false;const next=saved.slice();if(k>=0)next[k]=item;else next.unshift(item);if(!store.set(LS_C,next))return false;saved=next;renderSaved();return true;}};
 renderTracks(); renderSaved(); courseStats();

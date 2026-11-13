@@ -83,6 +83,7 @@ Caddy: `/srv/caddy/conf/pending/gildam-maps.caddy` (DNS 생기면 Caddyfile 에 
 - `web/public/` 정적 SPA — gildam-tiles(nginx)가 `/srv/gildam-web`(ro 마운트)로 서빙, 미일치 경로는 index.html.
 - 기존 경로(/v1 /admin /healthz → gildam-api, /tiles /styles /fonts /sprites → nginx) 그대로.
 - GPX는 브라우저 안에서만 처리, 저장은 localStorage. JS 라이브러리는 `web/public/vendor/`에 자체 호스팅(maplibre-gl 5, pmtiles 4, @protomaps/basemaps 5). 글꼴·스프라이트는 아직 protomaps.github.io.
+- 장소 검색: 화면 위 검색창. `GET /places/search?query=&rect=` 는 nginx가 `gildam-api`로 넘기고, API가 카카오 로컬 키워드 검색을 대신 호출한다. 키는 `.env`의 `KAKAO_REST_API_KEY`(브라우저에 넣지 않음) 또는 검색창 열쇠로 이 브라우저에만 저장한 값. 키가 없으면 검색만 거절하고 샘플 장소를 만들지 않는다. GPX는 전송하지 않는다. 반영하려면 API 이미지를 다시 만들고, `tiles/nginx.conf` 변경 후 `nginx -t && nginx -s reload`.
 - 프론트엔드 운영 반영·백업·롤백은 저장소 루트 `DEPLOY.md`를 따른다. 파일이 gildam-tiles에 읽기 전용으로 마운트되므로 보통 컨테이너 재시작·API 이미지 재빌드는 필요 없다.
 
 ## 지도 생성 (stage 2) — 관리 화면 「새 지도 만들기」
