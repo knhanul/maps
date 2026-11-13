@@ -133,6 +133,8 @@ B=/var/backups/maps/$STAMP
 WEB=/srv/gildam-api/web/public
 [ ! -e "\$B" ]
 sudo mkdir -p -m 700 "\$B/web-public" "\$B/editor-docs" "\$B/config" "\$B/env"
+# mkdir -p -m 은 새로 만든 상위 디렉터리에 모드가 안 먹을 수 있음
+sudo chmod 700 "\$B" "\$B/web-public" "\$B/editor-docs" "\$B/config" "\$B/env"
 sudo cp -a "\$WEB"/index.html "\$WEB"/app.js "\$WEB"/app.css "\$WEB"/editor.css \
   "\$WEB"/gpx-editor.js "\$WEB"/gpx-model.js "\$WEB"/trace.js "\$WEB"/trace-model.js \
   "\$WEB"/places.js "\$B/web-public/"
