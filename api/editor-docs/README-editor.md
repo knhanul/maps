@@ -20,7 +20,7 @@ Tests: 10k dense points, multiple segments/gaps, source/time/extensions unchange
 
 Rollback: restore dated backup app.js/index.html; new unused model/editor/css files may remain without being loaded. No service restart or backend changes are needed. Clear/reload browser page to restore old script version. Never delete users' browser-local saved data during rollback.
 
-# v12-pointedit — 점 단위 편집 개편 + 길 따라 보정 (2026-11-08, 미배포)
+# v12-pointedit — 점 단위 편집 개편 + 길 따라 보정 (2026-11-08, 운영 반영)
 
 ## 점 편집 (도구 모드 없음)
 - 지도: 점 클릭 = 선택, 끌기 = 이동, 선 위 클릭 = 그 위치에 점 추가(PC, 마우스를 올리면 + 표시), Shift+클릭 = 같은 구간 범위 선택, 우클릭 = 메뉴(삭제·앞/뒤 추가·구간 나누기·확대 / 범위 작업).
@@ -48,6 +48,7 @@ Rollback: restore dated backup app.js/index.html; new unused model/editor/css fi
 ## 배포/롤백
 - 변경 파일: web/public/{index.html, app.js, app.css, editor.css, gpx-model.js, gpx-editor.js}. 백엔드·라우팅·nginx 변경 없음. 캐시 버스터 `v12-pointedit`.
 - 롤백: 위 6개 파일을 이전 백업으로 되돌림. 브라우저 저장 데이터 형식은 그대로(새 split 결과도 기존 segments 배열 형식).
+- 운영 반영 절차의 자세한 내용은 저장소 루트 `DEPLOY.md`를 본다.
 
 ## 이미지로 GPX 만들기 (trace-model.js + trace.js)
 - 코스 편집 탭 → [이미지로 GPX 만들기]. PNG/JPG/WEBP ≤25MB, 처리용 최대 1600px로 축소. 이미지는 브라우저 밖으로 나가지 않음.
@@ -60,7 +61,7 @@ Rollback: restore dated backup app.js/index.html; new unused model/editor/css fi
 - 한계: 정확도는 이미지 해상도에 좌우(예: 770px에 30km면 1px≈40m). 같은 색 선이 겹치거나 갈라지면 경유점이 필요. 기준점을 잘못 찍으면 전체가 어긋남.
 - 테스트: `node --test test/trace-model.test.mjs`, 브라우저 `node test/e2e/trace.e2e.mjs`(합성 지도 이미지, 라우팅 모의). 변경 파일에 web/public/trace-model.js, trace.js 추가.
 
-# v13-studio — 길담 스튜디오 리모델링 (2026-11-13, 미배포)
+# v13-studio — 길담 스튜디오 리모델링 (2026-11-13, 운영 반영)
 
 ## 화면 구조
 - 이름을 **길담 스튜디오**로 바꾸고 기본 탭을 `코스 편집`으로 했다(`기록 비교`는 둘째 탭). 왼쪽 위 이름을 누르면 처음 화면으로 간다.
@@ -96,3 +97,4 @@ Rollback: restore dated backup app.js/index.html; new unused model/editor/css fi
 
 ## 배포/롤백
 - 변경 파일: web/public/{index.html, app.js, app.css, editor.css, gpx-model.js, gpx-editor.js}. 백엔드·라우팅 변경 없음. 캐시 버스터 `v13-studio`. 브라우저 저장 데이터 형식은 그대로다.
+- 운영 반영·백업·확인·롤백 절차는 저장소 루트 `DEPLOY.md`를 따른다.

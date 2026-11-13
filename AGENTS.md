@@ -14,5 +14,6 @@
 - Browser E2E (mocked routing, shared harness test/e2e/harness.mjs): `PLAYWRIGHT_CORE_DIR=<dir with playwright-core@1.55 + maplibre-gl@5 pmtiles@4 @protomaps/basemaps@5 maplibre-contour> CHROME=<chrome.exe> node test/e2e/gpx-roadsnap.e2e.mjs` and `node test/e2e/trace.e2e.mjs`. Map tiles/fonts come from maps.nuni.co.kr.
 
 ## Rules
-- Do not modify production server configs (/srv/..., compose, nginx) or deploy automatically.
+- Do not modify production server configs (/srv/..., compose, nginx) or deploy automatically unless the user explicitly asked to deploy.
+- Operator procedure for maps.nuni.co.kr (backup, frontend copy, verify, rollback) is in DEPLOY.md.
 - GPX files stay in the browser; only anchor coordinates may go to the own /routing/route.

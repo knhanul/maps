@@ -83,7 +83,7 @@ Caddy: `/srv/caddy/conf/pending/gildam-maps.caddy` (DNS 생기면 Caddyfile 에 
 - `web/public/` 정적 SPA — gildam-tiles(nginx)가 `/srv/gildam-web`(ro 마운트)로 서빙, 미일치 경로는 index.html.
 - 기존 경로(/v1 /admin /healthz → gildam-api, /tiles /styles /fonts /sprites → nginx) 그대로.
 - GPX는 브라우저 안에서만 처리, 저장은 localStorage. JS 라이브러리는 `web/public/vendor/`에 자체 호스팅(maplibre-gl 5, pmtiles 4, @protomaps/basemaps 5). 글꼴·스프라이트는 아직 protomaps.github.io.
-- 배포: rsync 후 `docker compose up -d gildam-tiles` (API 이미지 재빌드 불필요).
+- 프론트엔드 운영 반영·백업·롤백은 저장소 루트 `DEPLOY.md`를 따른다. 파일이 gildam-tiles에 읽기 전용으로 마운트되므로 보통 컨테이너 재시작·API 이미지 재빌드는 필요 없다.
 
 ## 지도 생성 (stage 2) — 관리 화면 「새 지도 만들기」
 - 관리 화면(maps.nuni.co.kr/admin)에서 빌드(최신/날짜)·범위(대한민국 프리셋/서울/직접)·최대 줌 선택 → `generate` 작업이 큐에 들어감. 작업 표에서 진행률·로그(최근 40줄) 확인, 5초마다 자동 새로고침.

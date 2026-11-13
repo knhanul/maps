@@ -2,7 +2,7 @@
 
 길담 앱은 길을 **기록**하는 앱이고, 길담 스튜디오(이 저장소)는 기록한 GPX를 **고치고 새 코스를 그리는** 웹입니다. 화면 개편 내용은 `api/editor-docs/README-editor.md`의 v13-studio 절을 보세요.
 
-https://maps.nuni.co.kr 운영 서버의 소스 스냅샷입니다. WEB `v10-gapfix1` 운영 스냅샷에 `v12-pointedit`(점 단위 편집 개편·길 따라 보정, 미배포) 변경을 더한 상태이며 Android 앱 저장소는 아닙니다. 기존 PUBLIC 저장소의 공개 범위는 변경하지 않았습니다.
+https://maps.nuni.co.kr 운영 서버와 맞춰 둔 소스입니다. Android 앱 저장소는 아닙니다. 운영에 반영하는 방법은 저장소 루트 `DEPLOY.md`를 보세요. 기존 PUBLIC 저장소의 공개 범위는 변경하지 않았습니다.
 
 ## 구성
 - `api/web/public/`: 지도, POI, 길 따라 코스 생성, 브라우저 내 원본 보존 GPX 직접 편집
@@ -12,6 +12,7 @@ https://maps.nuni.co.kr 운영 서버의 소스 스냅샷입니다. WEB `v10-gap
 - `api/tourism-tools/`: 선택적 TourAPI 어댑터. 키가 없어 현재 보충 데이터 비활성
 - `api/docker-compose.yml`, `api/tiles/nginx.conf`, `deployment/maps.caddy.example`: 해당 지도 서비스 배포 구성만
 - `routing/`: 자체 BRouter 프록시·제한된 Compose·걷기/등산/자전거 프로필·MIT 라이선스
+- `DEPLOY.md`: maps.nuni.co.kr 운영 반영·백업·확인·롤백
 - `api/editor-docs/`, 각 서비스 README: 상세 동작·운영 참고
 
 ## 실행·검증
