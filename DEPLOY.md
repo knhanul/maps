@@ -37,7 +37,7 @@ Caddy(`caddy:2`, 80/443)가 TLS를 종료합니다. 설정은 `/srv/caddy/conf/p
 | `/v1/*`, `/admin`, `/admin/*`, `/healthz` | `gildam-api:8080` |
 | 나머지(`/`, `/tiles`, `/styles`, `/fonts`, `/sprites`, `/routing/route` 등) | `gildam-tiles:8080` |
 
-`gildam-tiles`(nginx)는 웹을 `/srv/gildam-web`에서, 지도 자료를 `/srv/gildam-maps`에서 읽고, `/routing/route`만 `gildam-routing-api:17778`로 넘깁니다. `index.html`은 `Cache-Control: no-cache`, 그 밖의 웹 정적 파일은 `public, max-age=3600`이라 JS/CSS를 바꾸면 `index.html`의 `?v=` 캐시 버스터를 함께 올려야 합니다.
+`gildam-tiles`(nginx)는 웹을 `/srv/gildam-web`에서, 지도 자료를 `/srv/gildam-maps`에서 읽고, `/routing/route`는 `gildam-routing-api:17778`로, `/places/search`는 `gildam-api:8080`으로 넘깁니다. `/places/search`는 Caddy `@app`에 없으므로 타일 nginx를 거칩니다. Caddy를 바꿀 필요는 없습니다. `index.html`은 `Cache-Control: no-cache`, 그 밖의 웹 정적 파일은 `public, max-age=3600`이라 JS/CSS를 바꾸면 `index.html`의 `?v=` 캐시 버스터를 함께 올려야 합니다.
 
 ### 경로
 
@@ -179,7 +179,7 @@ BRouter JAR와 RD5 그래프, PMTiles 원본은 용량 때문에 이 백업에 �
 
 ## 5. 프론트엔드 반영
 
-대상 파일이 `api/web/public/`의 HTML/JS/CSS뿐이고, `api/src`, Dockerfile, compose, nginx, 경로, 타일 데이터가 그대로면 이미지를 다시 만들지 말고 컨테이너도 재시작하지 마세요. 바인드 마운트된 파일을 교체하면 nginx가 바로 새 내용을 줍니다.
+대상 파일이 `api/web/public/`의 HTML/JS/CSS뿐이고, `api/src`, Dockerfile, compose, nginx, 경로, 타일 데이터가 그대로면 이미지를 다시 만들지 말고 컨테이너도 재시작하지 마세요. 웹은 디렉터리가 마운트되어 있어서 그 안의 파일을 바꿔도 nginx가 바로 새 내용을 줍니다. `tiles/nginx.conf`처럼 파일 하나를 마운트한 경우는 아래 6절을 따르세요.
 
 `vendor/`, `places/`, 바뀌지 않은 `trace.js`·`trace-model.js`는 복사하지 않습니다. 문서만 갱신하려면 `/srv/gildam-api/editor-docs/README-editor.md`도 함께 복사할 수 있습니다.
 
@@ -228,7 +228,7 @@ EOS
 | 바뀐 것 | 할 일 | 하지 말 것 |
 |---|---|---|
 | `api/web/public/` HTML·JS·CSS만 | 5절대로 파일 교체. 캐시 버스터 갱신 | API/워커 이미지 빌드, 컨테이너 재시작, `.env` 수정 |
-| `api/tiles/nginx.conf` | 백업 후 파일 교체, `gildam-tiles` 안에서 `nginx -t` 다음 reload 또는 해당 서비스만 재생성 | 다른 compose 프로젝트 재시작 |
+| `api/tiles/nginx.conf` | 백업 후 **같은 inode에 덮어쓰기**(`cp --no-preserve=all`처럼 대상 파일을 연 뒤 내용만 바꿈). 컨테이너에서 해시가 호스트와 같은지 확인한 다음 `nginx -t`와 reload. `install`·`mv`·새 파일로 갈아끼우면 바인드 마운트가 옛 inode를 붙잡고, reload가 성공해도 옛 설정이 남습니다. 해시가 다르면 `/srv/gildam-api`에서 `sudo docker compose up -d --no-deps --no-build --force-recreate gildam-tiles`로 **타일만** 재생성 | 다른 compose 프로젝트 재시작, 웹 디렉터리 파일까지 같은 방식으로 재생성 |
 | `api/src/`, `api/Dockerfile`, `api/package.json` | 데이터·`.env`를 제외하고 코드만 올린 뒤, `/srv/gildam-api`에서 `sudo APP_REV=<짧은커밋> docker compose up -d --build gildam-api`처럼 **해당 서비스만**. 절차의 큰 틀은 `api/README.md` | `data/`, `.env`, weather/inal 볼륨 덮어쓰기 |
 | `api/map-worker/` | `gildam-map-worker`만 재빌드 | 지도 서빙을 위해 워커를 재시작할 필요는 없음 |
 | `routing/` 프록시·프로필·compose | `/srv/gildam-routing`만 백업·교체. 필요하면 그 디렉터리의 compose로 라우팅 컨테이너 두 개만 재기동 | `gildam-api` 재빌드, JAR/RD5를 실수로 삭제 |
