@@ -34,6 +34,22 @@ test("similarity fit recovers scale + rotation + translation and inverts exactly
   assert.throws(() => T.fitSimilarity([{ u: 5, v: 5, x: 0, y: 0 }, { u: 5, v: 5, x: 1, y: 1 }]), /너무 가깝/);
 });
 
+test("scaleAround keeps the image centre; rotateAround is reversible; translate shifts only", () => {
+  const T0={a:2e-6,b:0,tx:0.4,ty:0.3},w=200,h=100,c=T.apply(T0,w/2,h/2);
+  const scaled=T.scaleAround(T0,w,h,1.5);
+  assert.ok(Math.hypot(...T.apply(scaled,w/2,h/2).map((v,i)=>v-c[i]))<1e-15);
+  assert.ok(Math.abs(Math.hypot(scaled.a,scaled.b)-3e-6)<1e-18);
+  const rotated=T.rotateAround(T0,w,h,90),back=T.rotateAround(rotated,w,h,-90);
+  for(const k of ["a","b","tx","ty"])assert.ok(Math.abs(back[k]-T0[k])<1e-15,k);
+  assert.ok(Math.hypot(...T.apply(rotated,w/2,h/2).map((v,i)=>v-c[i]))<1e-15);
+  const corner=T.apply(T0,w,0),spun=T.apply(rotated,w,0);
+  assert.ok(Math.abs(spun[0]-(c[0]-(corner[1]-c[1])))<1e-12);
+  assert.ok(Math.abs(spun[1]-(c[1]+(corner[0]-c[0])))<1e-12);
+  const moved=T.translate(T0,0.01,-0.02);
+  assert.equal(moved.a,T0.a);assert.deepEqual(plain(T.apply(moved,0,0)),[T0.tx+0.01,T0.ty-0.02]);
+  assert.throws(()=>T.scaleAround(T0,w,h,0));
+});
+
 test("color pick prefers the saturated line pixel; mask excludes background and pale water", () => {
   const img = scene();
   assert.deepEqual(plain(T.pickColor(img, 140, 23)), BLUE, "click 3 px off the line still picks the line");

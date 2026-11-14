@@ -14,6 +14,9 @@ function fitSimilarity(pairs,current){
  const a=sa/ss,b=sb/ss;if(!(Math.hypot(a,b)>0))throw Error('기준점 배치를 확인하세요.');
  return{a,b,tx:mx-a*mu+b*mv,ty:my-b*mu-a*mv};
 }
+function scaleAround(T,w,h,k){if(!(k>0)||!isFinite(k))throw Error('크기 배율을 확인하세요.');const a=T.a*k,b=T.b*k,c=apply(T,w/2,h/2);return{a,b,tx:c[0]-a*w/2+b*h/2,ty:c[1]-b*w/2-a*h/2};}
+function rotateAround(T,w,h,deg){const r=deg*Math.PI/180,cos=Math.cos(r),sin=Math.sin(r),a=T.a*cos-T.b*sin,b=T.a*sin+T.b*cos,c=apply(T,w/2,h/2);return{a,b,tx:c[0]-a*w/2+b*h/2,ty:c[1]-b*w/2-a*h/2};}
+function translate(T,dx,dy){return{...T,tx:T.tx+dx,ty:T.ty+dy};}
 function residuals(T,pairs){return pairs.map(p=>{const q=apply(T,p.u,p.v);return Math.hypot(q[0]-p.x,q[1]-p.y);});}
 // Pick the most saturated pixel near (u,v): clicking exactly on a 3–5 px line is hard.
 function pickColor(img,u,v,r=4){const{width:w,height:h,data}=img;let best=null,bs=-1;for(let y=Math.max(0,Math.round(v)-r);y<=Math.min(h-1,Math.round(v)+r);y++)for(let x=Math.max(0,Math.round(u)-r);x<=Math.min(w-1,Math.round(u)+r);x++){const i=(y*w+x)*4,R=data[i],G=data[i+1],Bl=data[i+2],mx=Math.max(R,G,Bl),mn=Math.min(R,G,Bl),s=mx?(mx-mn)/mx:0,score=s*(mx-mn);if(data[i+3]>128&&score>bs){bs=score;best=[R,G,Bl];}}if(!best)throw Error('이미지 안을 누르세요.');return best;}
@@ -53,5 +56,5 @@ function deviation(routed,trace){const lat0=trace[0][1]*rad,kx=Math.cos(lat0)*R*
  const step=Math.max(1,Math.floor(routed.length/400));for(let k=0;k<routed.length;k+=step){const p=[routed[k][0]*kx,routed[k][1]*ky];let best=Infinity;for(let i=1;i<T.length;i++){const a=T[i-1],b=T[i],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1))),d=Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);if(d<best)best=d;}if(best>max)max=best;}return max;}
 function toGpx(name,parts){const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="길담 maps.nuni.co.kr (이미지 추출)" xmlns="http://www.topografix.com/GPX/1/1">\n<metadata><name>${esc(name)}</name></metadata>\n<trk><name>${esc(name)}</name>\n${parts.filter(p=>p.length>1).map(p=>`<trkseg>\n${p.map(c=>`<trkpt lat="${c[1].toFixed(7)}" lon="${c[0].toFixed(7)}"></trkpt>`).join('\n')}\n</trkseg>`).join('\n')}\n</trk>\n</gpx>\n`;}
-root.GildamTraceModel={apply,invert,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx};
+root.GildamTraceModel={apply,invert,scaleAround,rotateAround,translate,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx};
 })(typeof window!=='undefined'?window:globalThis);

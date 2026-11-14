@@ -17,12 +17,12 @@ function status(text,error=false){const n=$('traceStatus');n.textContent=text;n.
 function corners(){const{width:w,height:h}=st.img;return[[0,0],[w,0],[w,h],[0,h]].map(([u,v])=>px2ll(u,v));}
 function ensureLayers(){const m=map();if(!m?.getSource('course'))throw Error('지도를 준비하는 중입니다. 잠시 후 다시 시도하세요.');
  const before=m.getLayer('tracks-casing')?'tracks-casing':undefined;
- if(!m.getSource('trace-img')){m.addSource('trace-img',{type:'image',url:st.url,coordinates:corners()});m.addLayer({id:'trace-img',type:'raster',source:'trace-img',paint:{'raster-opacity':st.opacity,'raster-fade-duration':0}},before);}
+ if(!m.getSource('trace-img')){m.addSource('trace-img',{type:'image',url:st.url,coordinates:corners()});m.addLayer({id:'trace-img',type:'raster',source:'trace-img',paint:{'raster-opacity':st.opacity,'raster-fade-duration':0}},before);st.shownUrl=st.url;}
  for(const [id,color,width]of [['trace-line','#7b3fe4',4],['trace-snap','#ef8e15',5]])if(!m.getSource(id)){m.addSource(id,{type:'geojson',data:fc([])});m.addLayer({id,type:'line',source:id,layout:{'line-join':'round','line-cap':'round'},paint:{'line-color':color,'line-width':width,'line-opacity':.95}});}
  if(!m.getSource('trace-warn')){m.addSource('trace-warn',{type:'geojson',data:fc([])});m.addLayer({id:'trace-warn',type:'line',source:'trace-warn',paint:{'line-color':'#d0021b','line-width':8,'line-opacity':.55}});}
  return m;}
 function removeLayers(){const m=map();if(!m)return;for(const id of ['trace-img','trace-mask','trace-line','trace-snap','trace-warn']){if(m.getLayer(id))m.removeLayer(id);if(m.getSource(id))m.removeSource(id);}}
-function setOverlay(){const m=ensureLayers();m.getSource('trace-img').setCoordinates(corners());if(m.getSource('trace-mask'))m.getSource('trace-mask').setCoordinates(corners());m.setPaintProperty('trace-img','raster-opacity',st.opacity);placeHandles();placeMarks();}
+function setOverlay(){const m=ensureLayers();m.getSource('trace-img').setCoordinates(corners());if(m.getSource('trace-mask'))m.getSource('trace-mask').setCoordinates(corners());applyImageStyle();placeHandles();placeMarks();}
 function lineData(C){return fc(C&&C.length>1?[{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:C}}]:[]);}
 /* ---------- 1. load ---------- */
 async function loadFile(file){if(!file)return;if(!/^image\//.test(file.type||'image/png'))return status('이미지 파일(PNG·JPG·WEBP)을 선택하세요.',true);if(file.size>25*1024*1024)return status('25MB 이하 이미지만 사용할 수 있습니다.',true);
@@ -33,7 +33,7 @@ async function loadFile(file){if(!file)return;if(!/^image\//.test(file.type||'im
   const m=map(),c=m.getContainer(),cw=c.clientWidth,ch=c.clientHeight,cr=c.getBoundingClientRect(),pr=$('panel').getBoundingClientRect();let x0=0,x1=cw,y0=0,y1=ch;
   if(pr.width&&pr.width<cw*.6){x0=Math.min(cw*.5,pr.right-cr.left);const lr=$('layers')?.getBoundingClientRect();if(lr?.width&&lr.left-cr.left>x0+200)x1=lr.left-cr.left-10;}else if(pr.height)y1=Math.max(ch*.3,pr.top-cr.top);
   const pad=.08,tl=merc(m.unproject([x0+(x1-x0)*pad,y0+(y1-y0)*pad])),br=merc(m.unproject([x1-(x1-x0)*pad,y1-(y1-y0)*pad])),s=Math.min((br[0]-tl[0])/w,(br[1]-tl[1])/h),cx=(tl[0]+br[0])/2,cy=(tl[1]+br[1])/2;
-  st.T={a:s,b:0,tx:cx-s*w/2,ty:cy-s*h/2};ensureLayers();setOverlay();
+  st.T={a:s,b:0,tx:cx-s*w/2,ty:cy-s*h/2};st.baseS=s;st.emphasize=true;ensureLayers();setOverlay();
   status(`${file.name||'이미지'} · ${w}×${h}px${k<1?' (처리용으로 축소)':''}. 이제 위치를 맞추세요: [기준점 추가]로 이미지와 지도의 같은 지점을 2곳 이상 짝지으면 정확히 겹칩니다.`);render();}
  catch(e){status('이미지를 읽지 못했습니다: '+e.message,true);}}
 /* ---------- 2. align: drag handles + control-point pairs ---------- */
@@ -44,14 +44,31 @@ function placeHandles(){handles.forEach(h=>h.remove());handles=[];if(!st||st.loc
  const rot=new maplibregl.Marker({element:handleEl('scale','끌어서 크기·회전 조절'),draggable:true}).setLngLat(px2ll(w,h)).addTo(m);
  rot.on('drag',()=>{const p=merc(rot.getLngLat()),c=T.apply(st.T,w/2,h/2),du=w/2,dv=h/2,px=p[0]-c[0],py=p[1]-c[1],d2=du*du+dv*dv,a=(px*du+py*dv)/d2,b=(py*du-px*dv)/d2;st.T={a,b,tx:c[0]-a*w/2+b*h/2,ty:c[1]-b*w/2-a*h/2};redrawOverlay(false);});rot.on('dragend',dropFit);
  handles=[mid,rot];}
-function dropFit(){if(st.pairs.length){st.pairs=[];status('손으로 위치를 바꿔 기준점 맞춤을 초기화했습니다.');}setOverlay();render();}
+function dropFit(){if(st.pairs.length){st.pairs=[];st.fitError=null;status('손으로 위치를 바꿔 기준점 맞춤을 초기화했습니다. 패널의 크기·회전·위치로 다시 맞춘 뒤 기준점을 찍으세요.');}setOverlay();render();}
 let raf=0;function redrawOverlay(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;const m=map();m.getSource('trace-img')?.setCoordinates(corners());m.getSource('trace-mask')?.setCoordinates(corners());});}
-function startPair(){if(!st)return;st.mode='pairImg';st.prevOpacity=st.opacity;st.opacity=Math.max(st.opacity,.85);setOverlay();status('① 이미지에서 알아보기 쉬운 지점(교차로·다리·출발점 표시 등)을 누르세요.');render();}
-function pairClick(ll){if(st.mode==='pairImg'){const[u,v]=ll2px(ll);if(u<0||v<0||u>st.img.width||v>st.img.height)return status('이미지 안의 지점을 누르세요.',true);st.pending={u,v};st.mode='pairMap';st.opacity=.2;setOverlay();status('② 이제 바탕 지도에서 같은 지점을 누르세요. (이미지를 잠시 흐리게 했습니다)');render();return;}
- const[x,y]=merc(ll);st.pairs.push({...st.pending,x,y});st.pending=null;st.mode='idle';st.opacity=st.prevOpacity??.6;
+
+function contrastUrl(){if(st.contrastUrl)return st.contrastUrl;const src=st.canvas,c=document.createElement('canvas');c.width=src.width;c.height=src.height;const g=c.getContext('2d');g.filter='contrast(1.5) saturate(1.65) brightness(1.06)';g.drawImage(src,0,0);g.filter='none';return st.contrastUrl=c.toDataURL('image/png');}
+function applyImageStyle(){const m=map();if(!m?.getSource('trace-img')||!st)return;
+ const pairing=st.mode==='pairImg'||st.mode==='pairMap',boost=pairing&&st.emphasize!==false,url=boost?contrastUrl():st.url;
+ if(st.shownUrl!==url){try{m.getSource('trace-img').updateImage({url,coordinates:corners()});}catch{m.getSource('trace-img').setCoordinates(corners());}st.shownUrl=url;}
+ if(m.getLayer('trace-img')){m.setPaintProperty('trace-img','raster-opacity',st.opacity);m.setPaintProperty('trace-img','raster-contrast',0);m.setPaintProperty('trace-img','raster-saturation',0);}
+}
+function syncOpacityUi(){const v=Math.round((st?.opacity??0.6)*100);if($('traceOpacity')){$('traceOpacity').value=String(v);$('traceOpacity').setAttribute('aria-valuenow',String(v));}if($('traceOpacityVal'))$('traceOpacityVal').textContent=v+'%';}
+
+function canAdjust(){return !!(st&&!st.locked&&B.inCourse()&&!$('traceAlign').hidden);}
+function imageCenter(){return px2ll(st.img.width/2,st.img.height/2);}
+function scalePct(){const s=Math.hypot(st.T.a,st.T.b),base=st.baseS||s;return base>0?Math.round(100*s/base):100;}
+function setScalePct(pct,commit=true){if(!canAdjust())return;const base=st.baseS||Math.hypot(st.T.a,st.T.b),cur=Math.hypot(st.T.a,st.T.b),next=base*Math.max(.05,Math.min(20,Number(pct)/100));if(!(cur>0)||!(next>0))return;st.T=T.scaleAround(st.T,st.img.width,st.img.height,next/cur);if(commit)dropFit();else{redrawOverlay();syncScaleUi();}}
+function rotateBy(deg){if(!canAdjust())return;st.T=T.rotateAround(st.T,st.img.width,st.img.height,deg);dropFit();}
+function nudgeByPixels(dx,dy){if(!canAdjust()||!(dx||dy))return;const m=map();if(!m?.project)return;const c=imageCenter(),p=m.project(c),q=m.unproject([p.x+dx,p.y+dy]),from=merc(c),to=merc(q);st.T=T.translate(st.T,to[0]-from[0],to[1]-from[1]);dropFit();}
+function syncScaleUi(){if(!st||!$('traceScale'))return;const pct=Math.max(20,Math.min(400,scalePct()));$('traceScale').value=String(pct);$('traceScaleVal').textContent=scalePct()+'%';}
+function startPair(){if(!st)return;st.mode='pairImg';st.pending=null;if(st.emphasize==null)st.emphasize=true;setOverlay();status('① 이미지에서 알아보기 쉬운 지점을 누르세요. (이미지 점 → 지도 점, 최소 2곳). 구분이 어려우면 [대비 강조]를 켜 두세요.');render();}
+function pairClick(ll){if(st.mode==='pairImg'){const[u,v]=ll2px(ll);if(u<0||v<0||u>st.img.width||v>st.img.height)return status('이미지 안의 지점을 누르세요.',true);st.pending={u,v};st.mode='pairMap';setOverlay();status(`② 바탕 지도에서 방금 고른 지점과 같은 위치를 누르세요. (이미지 ${st.pairs.length+1}곳째 → 지도, 최소 2곳). 지도가 안 보이면 투명도를 낮추거나 [대비 강조]를 끄세요.`);render();return;}
+ const[x,y]=merc(ll);st.pairs.push({...st.pending,x,y});st.pending=null;st.mode='idle';
  try{st.T=T.fitSimilarity(st.pairs,st.T);}catch(e){st.pairs.pop();status(e.message,true);setOverlay();render();return;}
  const mpu=1/maplibregl.MercatorCoordinate.fromLngLat(ll).meterInMercatorCoordinateUnits(),res=T.residuals(st.T,st.pairs).map(r=>r*mpu);
- setOverlay();status(st.pairs.length<2?'기준점 1곳: 위치만 옮겼습니다. 멀리 떨어진 지점을 하나 더 짝지으면 크기·회전까지 맞춥니다.':`기준점 ${st.pairs.length}곳으로 맞췄습니다 · 평균 오차 ${Math.round(res.reduce((a,b)=>a+b,0)/res.length)}m, 최대 ${Math.round(Math.max(...res))}m${Math.max(...res)>100?' — 오차가 크면 기준점을 다시 찍어 보세요.':''}`);render();}
+ st.fitError=st.pairs.length?{avg:res.reduce((a,b)=>a+b,0)/res.length,max:Math.max(...res)}:null;
+ setOverlay();status(st.pairs.length<2?'기준점 1곳: 위치만 옮겼습니다. 멀리 떨어진 지점을 하나 더 짝지으면 크기·회전까지 맞춥니다.':`기준점 ${st.pairs.length}곳으로 맞췄습니다 · 평균 오차 ${Math.round(st.fitError.avg)}m, 최대 ${Math.round(st.fitError.max)}m${st.fitError.max>100?' — 오차가 크면 기준점을 지우고 다시 찍어 보세요.':''}`);render();}
 /* ---------- 3. colour ---------- */
 function startPick(){if(!st)return;st.mode='color';status('추출할 선(파란 선, 노란 선 등)을 누르세요.');render();}
 function colorClick(ll){const[u,v]=ll2px(ll);try{st.color=T.pickColor(st.img,u,v,4);}catch(e){return status(e.message,true);}st.mode='idle';rebuildMask();if(!st.A)st.mode='A';render();}
@@ -101,20 +118,33 @@ function mapClick(e){if(!st||!B.inCourse()||busy)return false;const ll=[e.lngLat
  if(st.mode==='pairImg'||st.mode==='pairMap'){pairClick(ll);return true;}if(st.mode==='color'){colorClick(ll);return true;}if((st.mode==='A'||st.mode==='B'||st.mode==='via')&&st.maskInfo){pointClick(ll);return true;}return false;}
 function render(){const has=!!st,el=$('traceTools');el.classList.toggle('has-image',has);
  for(const id of ['traceAlign','traceColorRow','tracePoints','traceRun','traceOut'])$(id).hidden=!has||(st.locked&&id!=='traceAlign');
- if(!has)return;$('traceOpacity').value=Math.round(st.opacity*100);$('traceTol').value=st.tol;$('traceTolVal').textContent=st.tol;$('traceGapVal').textContent=st.gapCost;$('traceGap').value=st.gapCost;
+ if(!has)return;syncOpacityUi();syncScaleUi();$('traceTol').value=st.tol;$('traceTolVal').textContent=st.tol;$('traceGapVal').textContent=st.gapCost;$('traceGap').value=st.gapCost;
  $('traceSwatch').style.background=st.color?`rgb(${st.color.join(',')})`:'transparent';$('traceSwatch').title=st.color?`rgb(${st.color.join(',')})`:'아직 고르지 않음';
  const on=(id,m)=>{$(id).classList.toggle('pri',st.mode===m);$(id).setAttribute('aria-pressed',String(st.mode===m));};on('tracePair','pairImg');if(st.mode==='pairMap')$('tracePair').classList.add('pri');on('tracePick','color');on('traceSetA','A');on('traceSetB','B');on('traceAddVia','via');
  for(const id of ['traceSetA','traceSetB','traceAddVia','traceClearVia'])$(id).disabled=!st.maskInfo||busy;$('traceClearVia').disabled=!st.vias.length||busy;
  $('traceExtract').disabled=!(st.maskInfo&&st.A&&st.B)||busy;$('traceSnap').disabled=!st.result||busy;$('traceOpen').disabled=$('traceDownload').disabled=!st.result||busy;
- $('tracePairInfo').textContent=st.pairs.length?`기준점 ${st.pairs.length}곳`:'기준점 없음';$('traceLock').textContent=st.locked?'위치 다시 조정':'위치 고정';
+ $('tracePairInfo').textContent=st.pairs.length?`기준점 ${st.pairs.length}곳 / 최소 2곳`:'기준점 없음 · 최소 2곳';$('traceLock').textContent=st.locked?'위치 다시 조정':'위치 고정';
+ const pairing=st.mode==='pairImg'||st.mode==='pairMap';el.classList.toggle('pairing',pairing);
+ $('traceEmphasize').setAttribute('aria-pressed',String(!!st.emphasize));$('traceEmphasize').classList.toggle('pri',!!st.emphasize);
+ const n=st.pairs.length,guide=$('tracePairGuide');
+ if(st.mode==='pairImg')guide.innerHTML=`다음: <b>이미지</b>에서 ${n+1}번째 지점을 누르세요. 순서: 이미지 점 → 지도 점 (현재 ${n}곳 / 최소 2곳).`;
+ else if(st.mode==='pairMap')guide.innerHTML=`다음: <b>바탕 지도</b>에서 방금 고른 지점과 같은 위치를 누르세요. (이미지 ${n+1}곳째 → 지도, 최소 2곳)`;
+ else if(n<2)guide.innerHTML=`순서: <b>이미지 점 → 지도 점</b>. 같은 지점을 최소 2곳 짝지으면 크기·회전까지 자동으로 맞춥니다. 현재 ${n}곳.`;
+ else guide.innerHTML=`기준점 ${n}곳. 오차가 크면 지우고 멀리 떨어진 지점을 다시 짝지으세요. 지도를 확대해도 위의 크기·회전·위치 버튼은 그대로 쓸 수 있습니다.`;
+ const err=$('traceFitError');
+ if(n===1){err.hidden=false;err.classList.remove('warn');err.textContent='맞춤 상태: 위치만 반영됨 · 크기·회전을 맞추려면 지점 1곳이 더 필요합니다.';}
+ else if(n>=2&&st.fitError){err.hidden=false;err.classList.toggle('warn',st.fitError.max>80);err.textContent=`맞춤 오차 평균 ${Math.round(st.fitError.avg)}m · 최대 ${Math.round(st.fitError.max)}m${st.fitError.max>80?' — 오차가 큽니다. 기준점을 다시 찍어 주세요.':''}`;}
+ else{err.hidden=true;err.textContent='';err.classList.remove('warn');}
+ for(const id of ['traceScaleDown','traceScaleUp','traceScale','traceRotL5','traceRotL1','traceRotR1','traceRotR5','traceNudgeUp','traceNudgeLeft','traceNudgeRight','traceNudgeDown'])$(id).disabled=st.locked||busy;
+
  if(!$('traceMode').dataset.touched)$('traceMode').value=B.mode();
  map()?.getCanvas&&(map().getCanvas().style.cursor=['pairImg','pairMap','color','A','B','via'].includes(st.mode)?'crosshair':'');}
-function setMode(m){if(!st)return;st.mode=st.mode===m?'idle':m;if(st.mode==='idle'&&(m==='pairImg')){st.opacity=st.prevOpacity??st.opacity;setOverlay();}
+function setMode(m){if(!st)return;st.mode=st.mode===m?'idle':m;if(st.mode==='idle'&&(m==='pairImg'||m==='pairMap')){st.pending=null;setOverlay();}
  if(st.mode==='A')status('출발점(A)을 선 위에 누르세요.');else if(st.mode==='B')status('도착점(B)을 선 위에 누르세요.');else if(st.mode==='via')status('경유점을 가는 순서대로 선 위에 누르세요.');render();}
 $('traceFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)loadFile(f);};
-$('traceOpacity').oninput=e=>{if(!st)return;st.opacity=Number(e.target.value)/100;map()?.setPaintProperty('trace-img','raster-opacity',st.opacity);};
-$('tracePair').onclick=()=>st&&(st.mode==='pairImg'||st.mode==='pairMap'?(st.mode='idle',st.pending=null,st.opacity=st.prevOpacity??st.opacity,setOverlay(),render()):startPair());
-$('tracePairReset').onclick=()=>{if(!st)return;st.pairs=[];placeMarks();status('기준점을 지웠습니다. 현재 위치는 유지합니다.');render();};
+$('traceOpacity').oninput=e=>{if(!st)return;st.opacity=Number(e.target.value)/100;syncOpacityUi();applyImageStyle();};
+$('tracePair').onclick=()=>st&&(st.mode==='pairImg'||st.mode==='pairMap'?(st.mode='idle',st.pending=null,setOverlay(),render()):startPair());
+$('tracePairReset').onclick=()=>{if(!st)return;st.pairs=[];st.fitError=null;st.pending=null;if(st.mode==='pairImg'||st.mode==='pairMap')st.mode='idle';placeMarks();applyImageStyle();status('기준점을 지웠습니다. 현재 위치는 유지합니다.');render();};
 $('traceLock').onclick=()=>{if(!st)return;st.locked=!st.locked;placeHandles();render();};
 $('tracePick').onclick=()=>st&&(st.mode==='color'?setMode('color'):startPick());
 $('traceTol').oninput=e=>{if(!st)return;st.tol=Number(e.target.value);$('traceTolVal').textContent=st.tol;clearTimeout(st.tolT);st.tolT=setTimeout(()=>{rebuildMask();render();},150);};
@@ -124,7 +154,28 @@ $('traceSetA').onclick=()=>setMode('A');$('traceSetB').onclick=()=>setMode('B');
 $('traceClearVia').onclick=()=>{if(!st)return;st.vias=[];st.result=st.snapped=null;updateLines();placeMarks();render();};
 $('traceExtract').onclick=extract;$('traceSnap').onclick=roadSnap;$('traceOpen').onclick=openEditor;$('traceDownload').onclick=download;$('traceClose').onclick=()=>close();
 $('traceMode').onchange=e=>{e.target.dataset.touched='1';};
+
+$('traceEmphasize').onclick=()=>{if(!st)return;st.emphasize=!st.emphasize;applyImageStyle();render();};
+$('traceScale').oninput=e=>setScalePct(e.target.value,false);
+$('traceScale').onchange=e=>setScalePct(e.target.value,true);
+$('traceScaleDown').onclick=()=>setScalePct(scalePct()/1.08,true);
+$('traceScaleUp').onclick=()=>setScalePct(scalePct()*1.08,true);
+$('traceRotL5').onclick=()=>rotateBy(-5);$('traceRotL1').onclick=()=>rotateBy(-1);
+$('traceRotR1').onclick=()=>rotateBy(1);$('traceRotR5').onclick=()=>rotateBy(5);
+$('traceNudgeUp').onclick=()=>nudgeByPixels(0,-8);$('traceNudgeDown').onclick=()=>nudgeByPixels(0,8);
+$('traceNudgeLeft').onclick=()=>nudgeByPixels(-8,0);$('traceNudgeRight').onclick=()=>nudgeByPixels(8,0);
+document.addEventListener('keydown',e=>{
+ if(!canAdjust()||busy)return;
+ if(e.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
+ const step=e.shiftKey?32:8;
+ if(e.key==='ArrowUp')nudgeByPixels(0,-step);
+ else if(e.key==='ArrowDown')nudgeByPixels(0,step);
+ else if(e.key==='ArrowLeft')nudgeByPixels(-step,0);
+ else if(e.key==='ArrowRight')nudgeByPixels(step,0);
+ else return;
+ e.preventDefault();
+});
 window.__trace={mapClick,setVisible:v=>{if(!st)return;[...handles,...marks].forEach(x=>x.getElement().style.display=v?'':'none');const m=map();for(const id of ['trace-img','trace-mask','trace-line','trace-snap','trace-warn'])if(m?.getLayer(id)&&!(id==='trace-mask'&&!$('traceShowMask').checked))m.setLayoutProperty(id,'visibility',v?'visible':'none');if(v){placeHandles();placeMarks();}},get active(){return !!st;}};
-window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router};
+window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router,setScalePct,rotateBy,nudgeByPixels,applyImageStyle,scalePct};
 render();
 })();

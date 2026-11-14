@@ -87,3 +87,24 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid #cbd0cc;border-bottom-wi
 .trace-pair{width:18px;height:18px;color:#d0021b;font:700 20px/18px system-ui;text-align:center;text-shadow:0 0 3px #fff;pointer-events:none}
 [data-stage=gpx] #cRouteStatus{display:none}
 .pc-acts .pc-other{grid-column:span 2;border-color:#b9c9c0;background:#f3f8f4}
+.trace-xform{margin:8px 0 6px;padding:8px;border:1px solid #d3ddd6;border-radius:10px;background:#fff}
+.trace-xform-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0;font-size:12.5px}
+.trace-xform-row>span:first-child{min-width:2.4em;font-weight:600;color:#3c4a44}
+.trace-xform-row button{min-width:2.4em;border:1px solid #c9d3cc;background:#f7faf8;border-radius:8px;padding:5px 7px;font:inherit;cursor:pointer}
+.trace-xform-row button:hover:not(:disabled){background:#eef5f0}
+.trace-xform-row input[type=range]{flex:1;min-width:80px}
+#traceScaleVal{min-width:3.2em;color:#4a544e}
+.trace-nudge-pad{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(3,28px);gap:2px}
+#traceNudgeUp{grid-column:2;grid-row:1}#traceNudgeLeft{grid-column:1;grid-row:2}#traceNudgeRight{grid-column:3;grid-row:2}#traceNudgeDown{grid-column:2;grid-row:3}
+.trace-look{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.trace-look .trace-range{flex:1;min-width:140px;margin:0}
+#traceEmphasize{border:1px solid #c9d3cc;background:#fff;border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#traceEmphasize[aria-pressed=true]{background:#3c2a7a;color:#fff;border-color:#3c2a7a}
+#traceOpacityVal{min-width:3.2em;font-weight:700;color:#3c4a44}
+#traceTools.pairing .trace-look{margin:8px 0;padding:10px;border:2px solid #3c2a7a;border-radius:12px;background:#f4f0ff}
+#traceTools.pairing #traceOpacity{height:28px;accent-color:#3c2a7a}
+#traceTools.pairing #traceOpacityVal{font-size:16px;color:#3c2a7a}
+#traceTools.pairing #traceLook label{font-weight:700;font-size:13.5px}
+.trace-fit{margin:6px 0 0;padding:6px 8px;border-radius:8px;background:#eef6f1;color:#1f4d3e;font-weight:700;font-size:13px}
+.trace-fit.warn{background:#fdecea;color:#8e1b14}
+#traceTools.pairing #tracePairGuide{font-weight:600;color:#3c2a7a}
+#traceXform button:disabled,#traceScale:disabled{opacity:.45;cursor:not-allowed}
