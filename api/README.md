@@ -89,6 +89,7 @@ Caddy: `/srv/caddy/conf/pending/gildam-maps.caddy` (DNS 생기면 Caddyfile 에 
 ## 지도 생성 (stage 2) — 관리 화면 「새 지도 만들기」
 - 관리 화면(maps.nuni.co.kr/admin)에서 빌드(최신/날짜)·범위(대한민국 프리셋/서울/직접)·최대 줌 선택 → `generate` 작업이 큐에 들어감. 작업 표에서 진행률·로그(최근 40줄) 확인, 5초마다 자동 새로고침.
 - API 는 `generate` params 를 검사만 함: `{build:"latest"|"YYYYMMDD", bbox:[w,s,e,n], maxzoom:0–15, region, version?}`. API 는 셸을 실행하지 않음.
+- 같은 프로세스의 스케줄러가 매주 월요일 03:00–03:29 KST에 `created_by=scheduler` 인 대한민국 전체(z15, latest) generate 작업을 한 건 넣습니다. 최근 6일 안에 같은 출처 작업이 있으면 건너뛰고, 게시는 하지 않습니다. 프로세스 시간대와 무관하게 Asia/Seoul 기준으로 30분마다 확인하며, 시작 시에도 한 번 검사합니다. 테스트에서는 `MAPS_SCHEDULER=0`으로 끕니다.
 - 워커 컨테이너 `gildam-map-worker` (`map-worker/`, node 24 + pmtiles CLI): 30초마다 `/v1/worker/jobs/claim` →
   1. `pmtiles extract --dry-run` 으로 크기 추정, **디스크 여유 < 크기×2 + 5GB 면 실패 처리**
   2. `incoming/.tmp-<ver>/` 에 추출 → `release.json`, `SHA256SUMS` → `incoming/<ver>` 로 이름 변경

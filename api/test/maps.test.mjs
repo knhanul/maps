@@ -19,7 +19,7 @@ function mkRelease(v) {
 }
 before(async () => {
   for (const s of ["incoming", "releases"]) fs.mkdirSync(path.join(root, s), { recursive: true });
-  api = spawn(process.execPath, ["--experimental-sqlite", "src/server.mjs"], { env: { ...process.env, PORT, DB_PATH: dir + "/t.sqlite", MAPS_ROOT: root, WORKER_TOKEN_SHA256: crypto.createHash("sha256").update(WT).digest("hex") }, stdio: "inherit" });
+  api = spawn(process.execPath, ["--experimental-sqlite", "src/server.mjs"], { env: { ...process.env, PORT, DB_PATH: dir + "/t.sqlite", MAPS_ROOT: root, MAPS_SCHEDULER: "0", WORKER_TOKEN_SHA256: crypto.createHash("sha256").update(WT).digest("hex") }, stdio: "inherit" });
   await new Promise((r) => setTimeout(r, 800));
   const db = new DatabaseSync(dir + "/t.sqlite");
   db.prepare("INSERT INTO admin_sessions (id_hash, sub, role, nickname, created_at, expires_at) VALUES (?,?,?,?,?,?)").run(crypto.createHash("sha256").update(SID).digest("hex"), "admin1", "platform_admin", "길담지기", Date.now(), Date.now() + 3600e3);

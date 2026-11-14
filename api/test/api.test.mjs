@@ -17,7 +17,7 @@ before(async () => {
     s.end(JSON.stringify({ keys: [jwk] }));
   }).listen(18098);
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "gd"));
-  api = spawn(process.execPath, ["--experimental-sqlite", "src/server.mjs"], { env: { ...process.env, PORT, BASE_PATH: "/gildam-api", OIDC_ISSUER: "https://id.test", JWKS_URL: "http://127.0.0.1:18098/", DB_PATH: dir + "/t.sqlite", USERINFO_URL: "http://127.0.0.1:18098/userinfo" }, stdio: "inherit" });
+  api = spawn(process.execPath, ["--experimental-sqlite", "src/server.mjs"], { env: { ...process.env, PORT, BASE_PATH: "/gildam-api", OIDC_ISSUER: "https://id.test", JWKS_URL: "http://127.0.0.1:18098/", DB_PATH: dir + "/t.sqlite", USERINFO_URL: "http://127.0.0.1:18098/userinfo", MAPS_SCHEDULER: "0" }, stdio: "inherit" });
   await new Promise((r) => setTimeout(r, 800));
 });
 after(() => { api.kill(); jw.close(); });
