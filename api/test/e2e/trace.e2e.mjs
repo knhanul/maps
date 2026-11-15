@@ -28,6 +28,34 @@ const pxToLL = (T, u, v) => page.evaluate(([T, u, v]) => { const l = new maplibr
 async function clickLL(ll) { const box = await page.locator("#map").boundingBox(); const p = await page.evaluate(ll => { const q = __map.project(ll); return [q.x, q.y]; }, ll); await page.mouse.click(box.x + p[0], box.y + p[1]); await page.waitForTimeout(120); }
 const truthLL = await Promise.all(ROUTE.map(([u, v]) => pxToLL(truth, u + 0.5, v + 0.5)));
 
+async function installCapture(page, kind) {
+  await page.evaluate(kind => {
+    const src = __traceTest.state.img, m = __map, canvas = m.getCanvas(), dw = canvas.width, dh = canvas.height;
+    const out = new ImageData(dw, dh), od = out.data;
+    if (kind === "noise") {
+      for (let i = 0; i < od.length; i += 4) {
+        const v = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const g = (v * 255) | 0;
+        od[i] = g; od[i + 1] = (g * 0.4) | 0; od[i + 2] = 255 - g; od[i + 3] = 255;
+      }
+    } else {
+      const scale = 0.88 * Math.min(dw / src.width, dh / src.height), ang = 8 * Math.PI / 180, a = scale * Math.cos(ang), b = scale * Math.sin(ang);
+      const tx = dw / 2 - a * (src.width / 2) + b * (src.height / 2);
+      const ty = dh / 2 - b * (src.width / 2) - a * (src.height / 2);
+      const Tpix = { a, b, tx, ty }, sd = src.data, sw = src.width, sh = src.height;
+      for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+        const [u, v] = GildamTraceModel.invert(Tpix, x, y), ui = Math.round(u), vi = Math.round(v), o = (y * dw + x) * 4;
+        if (ui < 0 || vi < 0 || ui >= sw || vi >= sh) { od[o] = od[o + 1] = od[o + 2] = 232; od[o + 3] = 255; continue; }
+        const i = (vi * sw + ui) * 4; od[o] = sd[i]; od[o + 1] = sd[i + 1]; od[o + 2] = sd[i + 2]; od[o + 3] = 255;
+      }
+      window.__qaAlignPix = Tpix;
+    }
+    __traceTest.setCapture(() => out);
+  }, kind);
+}
+
+
+
 await step("load image: overlay shown at current view, steps appear, nothing uploaded", async () => {
   const center = await pxToLL(truth, 450, 280); await page.evaluate(c => __map.jumpTo({ center: c, zoom: 10.5, padding: { left: 400, top: 40, right: 260, bottom: 40 } }), center);
   await page.click('.tab[data-tab="course"]');
@@ -39,6 +67,58 @@ await step("load image: overlay shown at current view, steps appear, nothing upl
   assert.ok(left > 360, "new overlay starts right of the side panel: " + Math.round(left));
   await shot(page, "trace-1-loaded.png");
 });
+await step("auto-align: injected map image succeeds, is undoable, and noise is rejected", async () => {
+  assert.equal(await page.locator("#traceAlignAuto").innerText(), "자동 맞춤 시도");
+  const before = await page.evaluate(() => ({ ...__traceTest.state.T }));
+  try {
+  await installCapture(page, "success");
+  await page.click("#traceAlignAuto");
+  await page.waitForFunction(() => /자동으로 맞췄습니다|자동 맞춤 실패/.test(document.getElementById("traceStatus").textContent), null, { timeout: 60000 });
+  const ok = await page.evaluate(() => ({
+    txt: document.getElementById("traceStatus").textContent,
+    T: { ...__traceTest.state.T },
+    undo: !document.getElementById("traceAlignUndo").hidden,
+    pairs: __traceTest.state.pairs.length,
+    pix: window.__qaAlignPix
+  }));
+  assert.match(ok.txt, /자동으로 맞췄습니다\. 확인 후 필요하면 기준점으로 미세 조정하세요/);
+  assert.match(ok.txt, /신뢰도/);
+  assert.equal(ok.pairs, 0);
+  assert.equal(ok.undo, true);
+  const errPx = await page.evaluate(([T, pix]) => {
+    const m = __map, canvas = m.getCanvas(), dpr = canvas.width / canvas.clientWidth;
+    const w = __traceTest.state.img.width, h = __traceTest.state.img.height;
+    let mx = 0;
+    for (const [u, v] of [[0, 0], [w, 0], [w, h], [0, h]]) {
+      const p = m.project(new maplibregl.MercatorCoordinate(T.a * u - T.b * v + T.tx, T.b * u + T.a * v + T.ty).toLngLat());
+      const [x, y] = GildamTraceModel.apply(pix, u, v);
+      mx = Math.max(mx, Math.hypot(p.x - x / dpr, p.y - y / dpr));
+    }
+    return mx;
+  }, [ok.T, ok.pix]);
+  assert.ok(errPx < 8, "auto-align corner error " + errPx.toFixed(2) + " css px");
+  await page.click("#traceAlignUndo");
+  const reverted = await page.evaluate(([b]) => {
+    const t = __traceTest.state.T;
+    return Math.hypot(t.a - b.a, t.b - b.b, t.tx - b.tx, t.ty - b.ty) < 1e-15 && document.getElementById("traceAlignUndo").hidden && /되돌렸습니다/.test(document.getElementById("traceStatus").textContent);
+  }, [before]);
+  assert.equal(reverted, true, "undo restores previous T");
+  await installCapture(page, "noise");
+  await page.click("#traceAlignAuto");
+  await page.waitForFunction(() => /자동 맞춤 실패/.test(document.getElementById("traceStatus").textContent), null, { timeout: 60000 });
+  const fail = await page.evaluate(b => {
+    const t = __traceTest.state.T, txt = document.getElementById("traceStatus").textContent;
+    return { same: Math.hypot(t.a - b.a, t.b - b.b, t.tx - b.tx, t.ty - b.ty) < 1e-15, txt, err: document.getElementById("traceStatus").classList.contains("err") };
+  }, before);
+  assert.match(fail.txt, /자동 맞춤 실패\. 기준점 또는 패널 조절을 사용해 주세요/);
+  assert.equal(fail.same, true, "failed auto-align must leave T unchanged");
+  assert.equal(fail.err, true);
+  await shot(page, "trace-1b-autoalign.png");
+  } finally {
+    await page.evaluate(t => { __traceTest.setCapture(null); if (t && __traceTest.state) __traceTest.setTransform(t); }, before);
+  }
+});
+
 await step("align with two control-point pairs via real map clicks (scale + rotation solved)", async () => {
   for (const [u, v] of [[80, 480], [780, 120]]) {
     await page.click("#tracePair");

@@ -90,3 +90,56 @@ test("waypoint sampling uses only existing trace vertices; deviation and GPX out
   assert.match(gpx, /A&amp;B &quot;코스&quot;/); assert.equal((gpx.match(/<trkseg>/g) || []).length, 1, "1-point parts skipped");
   assert.match(gpx, /lat="37.5000000" lon="127.0010000"/);
 });
+
+function sceneMap(w, h) {
+  const img = image(w, h);
+  polyline(img, [[20, 40], [180, 30], [260, 90], [240, 160], [80, 170], [30, 110], [20, 40]], [30, 30, 30], 1);
+  polyline(img, [[40, 20], [40, 200], [300, 200], [300, 20]], [20, 80, 160], 1);
+  polyline(img, [[70, 80], [200, 70], [210, 140], [90, 150]], [200, 40, 40], 2);
+  for (let i = 0; i < 6; i++) polyline(img, [[50 + i * 40, 10], [30 + i * 40, 210]], [90, 90, 90], 0);
+  return img;
+}
+function warpImage(src, w, h, T) {
+  const img = image(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const su = T.a * x - T.b * y + T.tx, sv = T.b * x + T.a * y + T.ty;
+    if (su < 0 || sv < 0 || su >= src.width - 1 || sv >= src.height - 1) continue;
+    const x0 = Math.floor(su), y0 = Math.floor(sv), x1 = x0 + 1, y1 = y0 + 1, fx = su - x0, fy = sv - y0;
+    const i = (y * w + x) * 4;
+    for (let c = 0; c < 3; c++) {
+      const a = src.data[(y0 * src.width + x0) * 4 + c], b = src.data[(y0 * src.width + x1) * 4 + c];
+      const dlt = src.data[(y1 * src.width + x0) * 4 + c], e = src.data[(y1 * src.width + x1) * 4 + c];
+      img.data[i + c] = a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + dlt * (1 - fx) * fy + e * fx * fy;
+    }
+    img.data[i + 3] = 255;
+  }
+  return img;
+}
+function noiseImage(w, h, seed = 1) {
+  const img = image(w, h); let s = seed;
+  for (let i = 0; i < w * h; i++) { s = (s * 1664525 + 1013904223) >>> 0; const v = s & 255; img.data[i * 4] = v; img.data[i * 4 + 1] = (s >> 8) & 255; img.data[i * 4 + 2] = (s >> 16) & 255; }
+  return img;
+}
+
+test("alignImages recovers a known scale+rotation+translation and rejects noise", async () => {
+  const map = sceneMap(320, 240);
+  const ang = 12 * Math.PI / 180, sc = 1.15;
+  const truth = { a: sc * Math.cos(ang), b: sc * Math.sin(ang), tx: 28, ty: -16 };
+  const user = warpImage(map, 260, 200, truth);
+  const t0 = Date.now();
+  const hit = await T.alignImages(user, map);
+  const ms = Date.now() - t0;
+  assert.equal(hit.ok, true, JSON.stringify({ ncc: hit.ncc, peak: hit.peak, overlap: hit.overlap, residual: hit.residual, reason: hit.reason, ms }));
+  // Compare in downscaled space: apply recovered T to user pixels after src scale, vs truth then dst scale.
+  const sx = hit.srcScaleX, sy = hit.srcScaleY, dx = hit.dstScaleX, dy = hit.dstScaleY;
+  let err = 0;
+  for (const [u, v] of [[20, 20], [200, 30], [40, 160], [180, 140], [130, 100]]) {
+    const [mx, my] = T.apply(truth, u, v);
+    const [px, py] = T.apply(hit.transform, u * sx, v * sy);
+    err = Math.max(err, Math.hypot(px / dx - mx, py / dy - my));
+  }
+  assert.ok(err < 4, "recovered transform off by " + err.toFixed(2) + " px, ncc=" + hit.ncc);
+  const miss = await T.alignImages(noiseImage(260, 200, 99), map);
+  assert.equal(miss.ok, false);
+  assert.ok(miss.confidence < 0.28 || miss.reason === "low_confidence" || miss.reason === "weak_edges");
+});

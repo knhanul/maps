@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#2f5d50">
 <link rel="stylesheet" href="vendor/maplibre-gl.css?v=10-gapfix1">
 <link rel="stylesheet" href="app.css?v=14-placesearch">
-<link rel="stylesheet" href="editor.css?v=15-tracealign">
+<link rel="stylesheet" href="editor.css?v=16-autoalign">
 </head>
 <body>
 <header class="top">
@@ -125,7 +125,7 @@
             <div class="trace-xform-row"><span>회전</span><button type="button" id="traceRotL5" title="왼쪽으로 5도">−5°</button><button type="button" id="traceRotL1" title="왼쪽으로 1도">−1°</button><button type="button" id="traceRotR1" title="오른쪽으로 1도">+1°</button><button type="button" id="traceRotR5" title="오른쪽으로 5도">+5°</button></div>
             <div class="trace-xform-row trace-nudge"><span>위치</span><div class="trace-nudge-pad"><button type="button" id="traceNudgeUp" aria-label="위로">↑</button><button type="button" id="traceNudgeLeft" aria-label="왼쪽으로">←</button><button type="button" id="traceNudgeRight" aria-label="오른쪽으로">→</button><button type="button" id="traceNudgeDown" aria-label="아래로">↓</button></div><span class="hint small">화살표 키로도 이동 · Shift는 더 크게. 지도를 확대해도 이 조절은 그대로 쓸 수 있습니다.</span></div>
           </div>
-          <div class="btns"><button id="tracePair" type="button" aria-pressed="false">기준점 추가</button><button id="tracePairReset" type="button">기준점 지우기</button><button id="traceLock" type="button">위치 고정</button></div>
+          <div class="btns"><button id="traceAlignAuto" type="button" title="현재 지도 화면과 이미지를 이 브라우저 안에서만 비교해 위치·크기·회전을 맞춥니다. 이미지는 서버로 보내지 않습니다.">자동 맞춤 시도</button><button id="traceAlignUndo" type="button" hidden>자동 맞춤 되돌리기</button><button id="tracePair" type="button" aria-pressed="false">기준점 추가</button><button id="tracePairReset" type="button">기준점 지우기</button><button id="traceLock" type="button">위치 고정</button></div>
           <div class="trace-look" id="traceLook"><label class="trace-range" for="traceOpacity">투명도 <input id="traceOpacity" type="range" min="0" max="100" value="60" aria-valuemin="0" aria-valuemax="100" aria-valuenow="60"> <span id="traceOpacityVal">60%</span></label><button id="traceEmphasize" type="button" aria-pressed="true" title="기준점을 찍을 때 이미지 대비를 높여 바탕 지도와 구분합니다. 끄면 원본으로 돌아갑니다.">대비 강조</button></div>
           <p id="tracePairGuide" class="hint small">순서: <b>이미지 점 → 지도 점</b>. 같은 지점을 최소 2곳 짝지으면 크기·회전까지 자동으로 맞춥니다.</p>
           <p id="traceFitError" class="trace-fit" hidden></p>
@@ -209,8 +209,8 @@ window.addEventListener('error',function(e){var file=e.filename||(e.target&&e.ta
 <script src="gpx-model.js?v=13-newsoft"></script>
 <script src="app.js?v=14-placesearch"></script>
 <script src="gpx-editor.js?v=13-newsoft"></script>
-<script src="trace-model.js?v=15-tracealign"></script>
-<script src="trace.js?v=15-tracealign"></script>
+<script src="trace-model.js?v=16-autoalign"></script>
+<script src="trace.js?v=16-autoalign"></script>
 <script src="places.js?v=10-gapfix1"></script>
 <script src="place-search.js?v=14-placesearch"></script>
 </body>

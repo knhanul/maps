@@ -56,5 +56,89 @@ function deviation(routed,trace){const lat0=trace[0][1]*rad,kx=Math.cos(lat0)*R*
  const step=Math.max(1,Math.floor(routed.length/400));for(let k=0;k<routed.length;k+=step){const p=[routed[k][0]*kx,routed[k][1]*ky];let best=Infinity;for(let i=1;i<T.length;i++){const a=T[i-1],b=T[i],dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1))),d=Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);if(d<best)best=d;}if(best>max)max=best;}return max;}
 function toGpx(name,parts){const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="길담 maps.nuni.co.kr (이미지 추출)" xmlns="http://www.topografix.com/GPX/1/1">\n<metadata><name>${esc(name)}</name></metadata>\n<trk><name>${esc(name)}</name>\n${parts.filter(p=>p.length>1).map(p=>`<trkseg>\n${p.map(c=>`<trkpt lat="${c[1].toFixed(7)}" lon="${c[0].toFixed(7)}"></trkpt>`).join('\n')}\n</trkseg>`).join('\n')}\n</trk>\n</gpx>\n`;}
-root.GildamTraceModel={apply,invert,scaleAround,rotateAround,translate,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx};
+
+/* Automatic image-to-map alignment (browser only). Pixel similarity transform is
+   searched with Sobel edges + phase correlation over a coarse scale/angle grid, then
+   scored with normalized cross-correlation. Thresholds:
+   ALIGN_MIN_NCC (0.28): accept if edge NCC is at least this after the best transform.
+   ALIGN_MIN_PEAK (5): phase-correlation peak / mean must exceed this (sharp peak).
+   ALIGN_MIN_OVERLAP (0.22): fraction of dest edge pixels that land inside the source.
+   ALIGN_MAX_RESIDUAL (6): mean residual in downscaled dest pixels after inlier refinement.
+   Scale 0.55–1.85 is in long-side-normalized space (≈1 when the image covers a similar extent to the current map view).
+   ALIGN_LONG_SIDE (256): final working resolution after a coarse 128px search; keeps the UI responsive with yieldEvery. */
+const ALIGN_LONG_SIDE=256,ALIGN_MIN_NCC=.28,ALIGN_MIN_PEAK=5,ALIGN_MIN_OVERLAP=.22,ALIGN_MAX_RESIDUAL=6;
+const ALIGN_ANGLE_MIN=-36,ALIGN_ANGLE_MAX=36,ALIGN_ANGLE_STEP=4;
+const ALIGN_SCALE_MIN=.55,ALIGN_SCALE_MAX=1.85,ALIGN_SCALE_STEPS=8;
+function nextPow2(n){let p=1;while(p<n)p<<=1;return p;}
+function lumaOf(img){const n=img.width*img.height,g=new Float32Array(n),d=img.data;for(let i=0,j=0;i<n;i++,j+=4){const a=(d[j+3]??255)/255;g[i]=((.2126*d[j]+.7152*d[j+1]+.0722*d[j+2])/255)*a;}return g;}
+function sampleGray(g,w,h,x,y){if(x<0||y<0||x>w-1||y>h-1)return 0;const x0=Math.floor(x),y0=Math.floor(y),x1=Math.min(w-1,x0+1),y1=Math.min(h-1,y0+1),fx=x-x0,fy=y-y0;return g[y0*w+x0]*(1-fx)*(1-fy)+g[y0*w+x1]*fx*(1-fy)+g[y1*w+x0]*(1-fx)*fy+g[y1*w+x1]*fx*fy;}
+function resizeRgba(img,nw,nh){const out=new Uint8ClampedArray(nw*nh*4),g=lumaOf(img),sw=img.width,sh=img.height,src=img.data;
+ for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){const u=(x+.5)*sw/nw-.5,v=(y+.5)*sh/nh-.5,x0=Math.max(0,Math.min(sw-1,u)),y0=Math.max(0,Math.min(sh-1,v));
+  const ix=Math.floor(x0),iy=Math.floor(y0),ix1=Math.min(sw-1,ix+1),iy1=Math.min(sh-1,iy+1),fx=x0-ix,fy=y0-iy,o=(y*nw+x)*4;
+  for(let c=0;c<4;c++){const a=src[(iy*sw+ix)*4+c],b=src[(iy*sw+ix1)*4+c],d=src[(iy1*sw+ix)*4+c],e=src[(iy1*sw+ix1)*4+c];out[o+c]=a*(1-fx)*(1-fy)+b*fx*(1-fy)+d*(1-fx)*fy+e*fx*fy;}}
+ return{width:nw,height:nh,data:out};}
+function fitLongSide(img,side){const m=Math.max(img.width,img.height);if(!(m>0))return{image:img,scaleX:1,scaleY:1};if(m<=side)return{image:img,scaleX:1,scaleY:1};
+ const k=side/m,nw=Math.max(1,Math.round(img.width*k)),nh=Math.max(1,Math.round(img.height*k));return{image:resizeRgba(img,nw,nh),scaleX:nw/img.width,scaleY:nh/img.height};}
+function sobelMag(gray,w,h){const m=new Float32Array(w*h);let max=0;for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x,gx=-gray[i-w-1]-2*gray[i-1]-gray[i+w-1]+gray[i-w+1]+2*gray[i+1]+gray[i+w+1],gy=-gray[i-w-1]-2*gray[i-w]-gray[i-w+1]+gray[i+w-1]+2*gray[i+w]+gray[i+w+1],v=Math.hypot(gx,gy);m[i]=v;if(v>max)max=v;}
+ if(max>0)for(let i=0;i<m.length;i++)m[i]/=max;return m;}
+function edgeEnergy(m){let s=0;for(let i=0;i<m.length;i++)s+=m[i];return s/m.length;}
+function fft1(re,im,n,inv){let j=0;for(let i=0;i<n;i++){if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t;}let k=n>>1;while(k>=1&&j>=k){j-=k;k>>=1;}j+=k;}
+ for(let size=2;size<=n;size<<=1){const half=size>>1,ang=(inv?2:-2)*Math.PI/size,wr0=Math.cos(ang),wi0=Math.sin(ang);
+  for(let i=0;i<n;i+=size){let cr=1,ci=0;for(let k=0;k<half;k++){const a=i+k,b=a+half,tr=cr*re[b]-ci*im[b],ti=cr*im[b]+ci*re[b];re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;const nr=cr*wr0-ci*wi0;ci=cr*wi0+ci*wr0;cr=nr;}}}
+ if(inv)for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;}}
+function fft2(re,im,w,h,inv){const rr=new Float64Array(w),ri=new Float64Array(w);for(let y=0;y<h;y++){const o=y*w;rr.set(re.subarray(o,o+w));ri.set(im.subarray(o,o+w));fft1(rr,ri,w,inv);re.set(rr,o);im.set(ri,o);}
+ const cr=new Float64Array(h),ci=new Float64Array(h);for(let x=0;x<w;x++){for(let y=0;y<h;y++){cr[y]=re[y*w+x];ci[y]=im[y*w+x];}fft1(cr,ci,h,inv);for(let y=0;y<h;y++){re[y*w+x]=cr[y];im[y*w+x]=ci[y];}}}
+function hann2(w,h){const a=new Float32Array(w*h);for(let y=0;y<h;y++){const wy=.5-.5*Math.cos(2*Math.PI*y/Math.max(1,h-1));for(let x=0;x<w;x++)a[y*w+x]=wy*(.5-.5*Math.cos(2*Math.PI*x/Math.max(1,w-1)));}return a;}
+function prepareDestFft(dest,w,h,window){const re=new Float64Array(w*h),im=new Float64Array(w*h);for(let i=0;i<w*h;i++)re[i]=dest[i]*(window?window[i]:1);fft2(re,im,w,h,false);return{re,im};}
+function phaseCorrShift(destFft,src,w,h,window,buf){const n=w*h;if(!buf||buf.n!==n){buf={n,re1:new Float64Array(n),im1:new Float64Array(n),re2:new Float64Array(n),im2:new Float64Array(n)};}
+ const{re1,im1,re2,im2}=buf;for(let i=0;i<n;i++){re2[i]=src[i]*(window?window[i]:1);im2[i]=0;}
+ fft2(re2,im2,w,h,false);
+ for(let i=0;i<n;i++){const pr=destFft.re[i]*re2[i]+destFft.im[i]*im2[i],pi=destFft.im[i]*re2[i]-destFft.re[i]*im2[i],mag=Math.hypot(pr,pi)||1e-12;re1[i]=pr/mag;im1[i]=pi/mag;}
+ fft2(re1,im1,w,h,true);let best=-Infinity,bx=0,by=0,sum=0,sum2=0;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const v=re1[y*w+x];sum+=v;sum2+=v*v;if(v>best){best=v;bx=x;by=y;}}
+ if(bx>w/2)bx-=w;if(by>h/2)by-=h;const mean=sum/n,std=Math.sqrt(Math.max(0,sum2/n-mean*mean));
+ return{dx:bx,dy:by,peak:best,ratio:std>1e-9?(best-mean)/std:0,buf};}
+function warp(src,sw,sh,dw,dh,T){const out=new Float32Array(dw*dh);for(let y=0;y<dh;y++)for(let x=0;x<dw;x++){const[u,v]=invert(T,x,y);out[y*dw+x]=sampleGray(src,sw,sh,u,v);}return out;}
+function nccAndResidual(src,sw,sh,dst,dw,dh,T){let sumS=0,sumD=0,sumS2=0,sumD2=0,sumSD=0,n=0,res=0,inside=0,total=0;const step=2;
+ for(let y=1;y<dh-1;y+=step)for(let x=1;x<dw-1;x+=step){const d=dst[y*dw+x];if(d<.08)continue;total++;const[u,v]=invert(T,x,y);if(u<1||v<1||u>sw-2||v>sh-2)continue;const s=sampleGray(src,sw,sh,u,v);sumS+=s;sumD+=d;sumS2+=s*s;sumD2+=d*d;sumSD+=s*d;n++;inside++;res+=Math.abs(s-d);}
+ const overlap=total?inside/total:0,den=Math.sqrt(Math.max(0,n*sumS2-sumS*sumS)*Math.max(0,n*sumD2-sumD*sumD)),ncc=(n>=80&&den>1e-9)?(n*sumSD-sumS*sumD)/den:0;
+ return{ncc,overlap,residual:n?res/n:1,samples:n};}
+function centerT(s,ang,sw,sh,dw,dh){const r=ang*Math.PI/180,a=s*Math.cos(r),b=s*Math.sin(r);return{a,b,tx:dw/2-a*(sw/2)+b*(sh/2),ty:dh/2-b*(sw/2)-a*(sh/2)};}
+function scales(){const out=[];for(let i=0;i<ALIGN_SCALE_STEPS;i++){const t=i/(ALIGN_SCALE_STEPS-1);out.push(ALIGN_SCALE_MIN*Math.pow(ALIGN_SCALE_MAX/ALIGN_SCALE_MIN,t));}return out;}
+function angles(){const out=[];for(let a=ALIGN_ANGLE_MIN;a<=ALIGN_ANGLE_MAX+1e-9;a+=ALIGN_ANGLE_STEP)out.push(a);return out;}
+function fail(reason,extra){return{ok:false,confidence:0,transform:null,ncc:0,peak:0,overlap:0,residual:null,reason,...extra};}
+async function searchGrid(srcE,sw,sh,dstE,dw,dh,jobs,opts,pcBuf){
+ const pad=nextPow2(Math.max(dw,dh,sw,sh)),D=new Float32Array(pad*pad);for(let y=0;y<dh;y++)D.set(dstE.subarray(y*dw,y*dw+dw),y*pad);
+ const win=hann2(pad,pad),destFft=prepareDestFft(D,pad,pad,win);let best=null;
+ for(let i=0;i<jobs.length;i++){const{ang,s}=jobs[i],T0=centerT(s,ang,sw,sh,dw,dh),warped=warp(srcE,sw,sh,pad,pad,T0),pc=phaseCorrShift(destFft,warped,pad,pad,win,pcBuf);pcBuf=pc.buf;
+  const T={a:T0.a,b:T0.b,tx:T0.tx+pc.dx,ty:T0.ty+pc.dy},score=nccAndResidual(srcE,sw,sh,dstE,dw,dh,T),rank=score.ncc+Math.min(.15,pc.ratio/80);
+  if(!best||rank>best.rank)best={T,score,peak:pc.ratio,rank,ang,s};
+  if(opts.yieldEvery&&(i%opts.yieldEvery===opts.yieldEvery-1))await(opts.yieldFn||(()=>new Promise(r=>setTimeout(r,0))))();}
+ return best;
+}
+async function alignImages(srcImg,dstImg,opts={}){
+ if(!srcImg?.width||!dstImg?.width)return fail('empty');
+ const srcFit=fitLongSide(srcImg,ALIGN_LONG_SIDE),dstFit=fitLongSide(dstImg,ALIGN_LONG_SIDE);
+ const src=srcFit.image,dst=dstFit.image,sw=src.width,sh=src.height,dw=dst.width,dh=dst.height;
+ const srcE=sobelMag(lumaOf(src),sw,sh),dstE=sobelMag(lumaOf(dst),dw,dh);
+ if(edgeEnergy(srcE)<.01||edgeEnergy(dstE)<.01)return fail('weak_edges');
+ // Coarse search at long side 128, then refine at ALIGN_LONG_SIDE around the winner.
+ const srcLo=fitLongSide(src,128),dstLo=fitLongSide(dst,128),sl=srcLo.image,dl=dstLo.image;
+ const srcLE=sobelMag(lumaOf(sl),sl.width,sl.height),dstLE=sobelMag(lumaOf(dl),dl.width,dl.height);
+ const coarseJobs=[];for(const ang of angles())for(const s of scales())coarseJobs.push({ang,s});
+ const coarse=await searchGrid(srcLE,sl.width,sl.height,dstLE,dl.width,dl.height,coarseJobs,opts,null);
+ if(!coarse)return fail('no_candidate');
+ const ba=coarse.ang,bs=coarse.s,fineJobs=[];
+ for(const ang of [ba-3,ba-2,ba-1,ba,ba+1,ba+2,ba+3])for(const s of [bs*.88,bs*.92,bs*.96,bs,bs*1.04,bs*1.08,bs*1.12])fineJobs.push({ang,s});
+ const mid=await searchGrid(srcE,sw,sh,dstE,dw,dh,fineJobs,opts,null);
+ if(!mid)return fail('no_candidate');
+ const tightJobs=[];for(const ang of [mid.ang-1,mid.ang-.5,mid.ang,mid.ang+.5,mid.ang+1])for(const s of [mid.s*.97,mid.s*.985,mid.s,mid.s*1.015,mid.s*1.03])tightJobs.push({ang,s});
+ const refined=await searchGrid(srcE,sw,sh,dstE,dw,dh,tightJobs,opts,null)||mid;
+ const{T,score,peak}=refined;
+ if(!(score.ncc>=ALIGN_MIN_NCC)||!(peak>=ALIGN_MIN_PEAK)||!(score.overlap>=ALIGN_MIN_OVERLAP)||score.residual>ALIGN_MAX_RESIDUAL)
+  return fail('low_confidence',{ncc:score.ncc,peak,overlap:score.overlap,residual:score.residual});
+ // Map downscaled-src pixels → downscaled-dst pixels; callers convert with scaleX/scaleY.
+ return{ok:true,confidence:Math.max(0,Math.min(1,score.ncc)),transform:T,ncc:score.ncc,peak,overlap:score.overlap,residual:score.residual,reason:'ok',srcScaleX:srcFit.scaleX,srcScaleY:srcFit.scaleY,dstScaleX:dstFit.scaleX,dstScaleY:dstFit.scaleY,srcSize:{w:sw,h:sh},dstSize:{w:dw,h:dh}};
+}
+root.GildamTraceModel={apply,invert,scaleAround,rotateAround,translate,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx,fitLongSide,resizeRgba,alignImages};
 })(typeof window!=='undefined'?window:globalThis);

@@ -34,7 +34,7 @@ async function loadFile(file){if(!file)return;if(!/^image\//.test(file.type||'im
   if(pr.width&&pr.width<cw*.6){x0=Math.min(cw*.5,pr.right-cr.left);const lr=$('layers')?.getBoundingClientRect();if(lr?.width&&lr.left-cr.left>x0+200)x1=lr.left-cr.left-10;}else if(pr.height)y1=Math.max(ch*.3,pr.top-cr.top);
   const pad=.08,tl=merc(m.unproject([x0+(x1-x0)*pad,y0+(y1-y0)*pad])),br=merc(m.unproject([x1-(x1-x0)*pad,y1-(y1-y0)*pad])),s=Math.min((br[0]-tl[0])/w,(br[1]-tl[1])/h),cx=(tl[0]+br[0])/2,cy=(tl[1]+br[1])/2;
   st.T={a:s,b:0,tx:cx-s*w/2,ty:cy-s*h/2};st.baseS=s;st.emphasize=true;ensureLayers();setOverlay();
-  status(`${file.name||'이미지'} · ${w}×${h}px${k<1?' (처리용으로 축소)':''}. 이제 위치를 맞추세요: [기준점 추가]로 이미지와 지도의 같은 지점을 2곳 이상 짝지으면 정확히 겹칩니다.`);render();}
+  status(`${file.name||'이미지'} · ${w}×${h}px${k<1?' (처리용으로 축소)':''}. 이제 위치를 맞추세요: [자동 맞춤 시도]로 먼저 겹쳐 보거나, [기준점 추가]로 이미지와 지도의 같은 지점을 2곳 이상 짝지으면 정확히 겹칩니다.`);render();}
  catch(e){status('이미지를 읽지 못했습니다: '+e.message,true);}}
 /* ---------- 2. align: drag handles + control-point pairs ---------- */
 function handleEl(cls,title){const el=document.createElement('div');el.className='trace-handle '+cls;el.title=title;return el;}
@@ -62,6 +62,56 @@ function setScalePct(pct,commit=true){if(!canAdjust())return;const base=st.baseS
 function rotateBy(deg){if(!canAdjust())return;st.T=T.rotateAround(st.T,st.img.width,st.img.height,deg);dropFit();}
 function nudgeByPixels(dx,dy){if(!canAdjust()||!(dx||dy))return;const m=map();if(!m?.project)return;const c=imageCenter(),p=m.project(c),q=m.unproject([p.x+dx,p.y+dy]),from=merc(c),to=merc(q);st.T=T.translate(st.T,to[0]-from[0],to[1]-from[1]);dropFit();}
 function syncScaleUi(){if(!st||!$('traceScale'))return;const pct=Math.max(20,Math.min(400,scalePct()));$('traceScale').value=String(pct);$('traceScaleVal').textContent=scalePct()+'%';}
+
+let captureOverride=null;
+function waitMapRender(m){return new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('지도 화면을 읽지 못했습니다.')),5000);m.once('render',()=>{clearTimeout(t);resolve();});m.triggerRepaint();});}
+function isBlankImage(img){const{data,width:w,height:h}=img;if(!w||!h)return true;let min=255,max=0,samples=0;const step=Math.max(1,Math.floor(Math.sqrt(w*h)/80));
+ for(let y=0;y<h;y+=step)for(let x=0;x<w;x+=step){const i=(y*w+x)*4,v=(data[i]+data[i+1]+data[i+2])/3;if(data[i+3]<8)continue;samples++;if(v<min)min=v;if(v>max)max=v;}
+ return samples<20||(max-min)<8;}
+async function captureMapView(){
+ if(typeof captureOverride==='function'){const img=await captureOverride();if(!img?.width)throw Error('지도 화면을 읽지 못했습니다.');return img;}
+ const m=map();if(!m?.getCanvas)throw Error('지도를 준비하는 중입니다. 잠시 후 다시 시도하세요.');
+ const canvas=m.getCanvas(),hidden=[];
+ for(const id of ['trace-img','trace-mask','trace-line','trace-snap','trace-warn']){if(m.getLayer(id)&&m.getLayoutProperty(id,'visibility')!=='none'){m.setLayoutProperty(id,'visibility','none');hidden.push(id);}}
+ const prevDisp=[...handles,...marks].map(h=>{const el=h.getElement(),d=el.style.display;el.style.display='none';return{el,d};});
+ try{await waitMapRender(m);await waitMapRender(m);
+  const w=canvas.width,h=canvas.height;if(!(w>8&&h>8))throw Error('지도 화면을 읽지 못했습니다.');
+  const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+  try{g.drawImage(canvas,0,0);}catch{throw Error('tainted');}
+  const img=g.getImageData(0,0,w,h);if(isBlankImage(img))throw Error('blank');
+  return img;}
+ catch(e){const why=e&&e.message;if(why==='tainted'||/tainted|SecurityError|origin/i.test(String(why)))throw Error('지도 화면을 읽지 못했습니다. 브라우저가 다른 출처의 지도 타일을 막고 있을 수 있습니다.');
+  if(why==='blank')throw Error('지도 화면이 비어 있습니다. 지도가 다 그려진 뒤 다시 시도하세요.');
+  throw Error(why&&why!=='tainted'?('지도 화면을 읽지 못했습니다: '+why):'지도 화면을 읽지 못했습니다.');}
+ finally{for(const id of hidden){if(m.getLayer(id))m.setLayoutProperty(id,'visibility','visible');}prevDisp.forEach(({el,d})=>{el.style.display=d;});m.triggerRepaint();}}
+function pixelTToMercator(result){
+ const m=map(),canvas=m.getCanvas(),dpr=canvas.clientWidth?canvas.width/canvas.clientWidth:(m.getPixelRatio?.()||1);
+ const sx=result.srcScaleX||1,sy=result.srcScaleY||1,dx=result.dstScaleX||1,dy=result.dstScaleY||1,t=result.transform;
+ const w=st.img.width,h=st.img.height,samples=[[0,0],[w,0],[w,h],[0,h],[w/2,h/2]];
+ const pairs=samples.map(([u,v])=>{const[xd,yd]=T.apply(t,u*sx,v*sy),ll=m.unproject([xd/dx/dpr,yd/dy/dpr]),[x,y]=merc(ll);return{u,v,x,y};});
+ return T.fitSimilarity(pairs);
+}
+async function autoAlign(){
+ if(!st||busy||st.locked)return {ok:false,reason:'busy'};
+ const prev={T:{...st.T},pairs:st.pairs.slice(),fitError:st.fitError};
+ busy=true;if($('traceAlignAuto'))$('traceAlignAuto').setAttribute('aria-busy','true');
+ status('현재 지도 화면과 이미지를 비교해 자동으로 맞추는 중… (이미지는 이 브라우저 안에서만 처리합니다)');render();
+ try{await new Promise(r=>setTimeout(r,30));
+  const mapImg=await captureMapView();
+  const result=await T.alignImages(st.img,mapImg,{yieldEvery:3,yieldFn:()=>new Promise(r=>setTimeout(r,0))});
+  if(!st)return {ok:false,reason:'closed'};
+  if(!result.ok){status('자동 맞춤 실패. 기준점 또는 패널 조절을 사용해 주세요',true);return result;}
+  const next=pixelTToMercator(result);
+  st.alignUndo=prev;st.T=next;st.pairs=[];st.fitError=null;st.pending=null;
+  if(st.mode==='pairImg'||st.mode==='pairMap')st.mode='idle';
+  setOverlay();
+  const conf=Math.round((result.confidence||0)*100),ncc=(result.ncc||0).toFixed(2),res=result.residual==null?'':result.residual.toFixed(2);
+  status(`자동으로 맞췄습니다. 확인 후 필요하면 기준점으로 미세 조정하세요 · 신뢰도 ${conf}% (상관 ${ncc}${res!==''?`, 오차 ${res}px`:''})`);
+  return result;}
+ catch(e){if(st)status('자동 맞춤 실패. 기준점 또는 패널 조절을 사용해 주세요',true);return {ok:false,reason:e.message||'error'};}
+ finally{busy=false;if($('traceAlignAuto'))$('traceAlignAuto').setAttribute('aria-busy','false');if(st)render();}}
+function undoAlign(){if(!st?.alignUndo)return;const u=st.alignUndo;st.T=u.T;st.pairs=u.pairs||[];st.fitError=u.fitError||null;st.alignUndo=null;setOverlay();status('자동 맞춤을 되돌렸습니다. 기준점 또는 패널 조절로 다시 맞출 수 있습니다.');render();}
+
 function startPair(){if(!st)return;st.mode='pairImg';st.pending=null;if(st.emphasize==null)st.emphasize=true;setOverlay();status('① 이미지에서 알아보기 쉬운 지점을 누르세요. (이미지 점 → 지도 점, 최소 2곳). 구분이 어려우면 [대비 강조]를 켜 두세요.');render();}
 function pairClick(ll){if(st.mode==='pairImg'){const[u,v]=ll2px(ll);if(u<0||v<0||u>st.img.width||v>st.img.height)return status('이미지 안의 지점을 누르세요.',true);st.pending={u,v};st.mode='pairMap';setOverlay();status(`② 바탕 지도에서 방금 고른 지점과 같은 위치를 누르세요. (이미지 ${st.pairs.length+1}곳째 → 지도, 최소 2곳). 지도가 안 보이면 투명도를 낮추거나 [대비 강조]를 끄세요.`);render();return;}
  const[x,y]=merc(ll);st.pairs.push({...st.pending,x,y});st.pending=null;st.mode='idle';
@@ -124,6 +174,8 @@ function render(){const has=!!st,el=$('traceTools');el.classList.toggle('has-ima
  for(const id of ['traceSetA','traceSetB','traceAddVia','traceClearVia'])$(id).disabled=!st.maskInfo||busy;$('traceClearVia').disabled=!st.vias.length||busy;
  $('traceExtract').disabled=!(st.maskInfo&&st.A&&st.B)||busy;$('traceSnap').disabled=!st.result||busy;$('traceOpen').disabled=$('traceDownload').disabled=!st.result||busy;
  $('tracePairInfo').textContent=st.pairs.length?`기준점 ${st.pairs.length}곳 / 최소 2곳`:'기준점 없음 · 최소 2곳';$('traceLock').textContent=st.locked?'위치 다시 조정':'위치 고정';
+ $('traceAlignAuto').disabled=st.locked||busy;$('traceAlignAuto').setAttribute('aria-busy',String(!!(busy&&$('traceAlignAuto').getAttribute('aria-busy')==='true')));
+ $('traceAlignUndo').hidden=!st.alignUndo;$('traceAlignUndo').disabled=!st.alignUndo||st.locked||busy;
  const pairing=st.mode==='pairImg'||st.mode==='pairMap';el.classList.toggle('pairing',pairing);
  $('traceEmphasize').setAttribute('aria-pressed',String(!!st.emphasize));$('traceEmphasize').classList.toggle('pri',!!st.emphasize);
  const n=st.pairs.length,guide=$('tracePairGuide');
@@ -146,6 +198,8 @@ $('traceOpacity').oninput=e=>{if(!st)return;st.opacity=Number(e.target.value)/10
 $('tracePair').onclick=()=>st&&(st.mode==='pairImg'||st.mode==='pairMap'?(st.mode='idle',st.pending=null,setOverlay(),render()):startPair());
 $('tracePairReset').onclick=()=>{if(!st)return;st.pairs=[];st.fitError=null;st.pending=null;if(st.mode==='pairImg'||st.mode==='pairMap')st.mode='idle';placeMarks();applyImageStyle();status('기준점을 지웠습니다. 현재 위치는 유지합니다.');render();};
 $('traceLock').onclick=()=>{if(!st)return;st.locked=!st.locked;placeHandles();render();};
+$('traceAlignAuto').onclick=()=>autoAlign();
+$('traceAlignUndo').onclick=()=>undoAlign();
 $('tracePick').onclick=()=>st&&(st.mode==='color'?setMode('color'):startPick());
 $('traceTol').oninput=e=>{if(!st)return;st.tol=Number(e.target.value);$('traceTolVal').textContent=st.tol;clearTimeout(st.tolT);st.tolT=setTimeout(()=>{rebuildMask();render();},150);};
 $('traceGap').oninput=e=>{if(!st)return;st.gapCost=Number(e.target.value);$('traceGapVal').textContent=st.gapCost;};
@@ -176,6 +230,6 @@ document.addEventListener('keydown',e=>{
  e.preventDefault();
 });
 window.__trace={mapClick,setVisible:v=>{if(!st)return;[...handles,...marks].forEach(x=>x.getElement().style.display=v?'':'none');const m=map();for(const id of ['trace-img','trace-mask','trace-line','trace-snap','trace-warn'])if(m?.getLayer(id)&&!(id==='trace-mask'&&!$('traceShowMask').checked))m.setLayoutProperty(id,'visibility',v?'visible':'none');if(v){placeHandles();placeMarks();}},get active(){return !!st;}};
-window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router,setScalePct,rotateBy,nudgeByPixels,applyImageStyle,scalePct};
+window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router,setScalePct,rotateBy,nudgeByPixels,applyImageStyle,scalePct,autoAlign,undoAlign,setCapture:fn=>{captureOverride=fn||null;},captureMapView};
 render();
 })();
