@@ -143,3 +143,63 @@ test("alignImages recovers a known scale+rotation+translation and rejects noise"
   assert.equal(miss.ok, false);
   assert.ok(miss.confidence < 0.28 || miss.reason === "low_confidence" || miss.reason === "weak_edges");
 });
+
+test("suggestLineColor prefers the saturated drawn line over pale water and paper", () => {
+  const img = scene();
+  const hit = T.suggestLineColor(img);
+  assert.ok(hit && hit.color, "expected a suggestion");
+  const [r, g, b] = hit.color;
+  assert.ok(b > 180 && r < 90 && b > g, "suggested " + hit.color.join(",") + " should be the blue route, not the river");
+  const blank = image(80, 60);
+  assert.equal(T.suggestLineColor(blank), null);
+});
+
+test("snapToPolylines snaps to the nearest edge, vertex, or intersection and rejects far clicks", () => {
+  const horiz = [[[0, 10], [100, 10]]];
+  const edge = T.snapToPolylines(50, 14, horiz, { radius: 16 });
+  assert.equal(edge.ok, true);
+  assert.equal(edge.kind, "edge");
+  assert.ok(Math.hypot(edge.x - 50, edge.y - 10) < 0.01, JSON.stringify(edge));
+  const L = [[[0, 0], [0, 50], [50, 50]]];
+  const vtx = T.snapToPolylines(3, 48, L, { radius: 16 });
+  assert.equal(vtx.ok, true);
+  assert.ok(Math.hypot(vtx.x - 0, vtx.y - 50) < 0.01);
+  assert.ok(vtx.kind === "vertex" || vtx.kind === "intersection");
+  const cross = [[[0, 50], [100, 50]], [[50, 0], [50, 100]]];
+  const ix = T.snapToPolylines(54, 53, cross, { radius: 16 });
+  assert.equal(ix.ok, true);
+  assert.equal(ix.kind, "intersection");
+  assert.ok(Math.hypot(ix.x - 50, ix.y - 50) < 0.01, JSON.stringify(ix));
+  const miss = T.snapToPolylines(200, 200, cross, { radius: 16 });
+  assert.equal(miss.ok, false);
+});
+
+test("worstResidualIndex and pairResidualMeters flag the largest error", () => {
+  const Tf = { a: 1, b: 0, tx: 0, ty: 0 };
+  const pairs = [
+    { u: 0, v: 0, x: 0, y: 0 },
+    { u: 10, v: 0, x: 10, y: 5 },
+    { u: 20, v: 0, x: 20, y: 1 }
+  ];
+  const report = T.pairResidualMeters(Tf, pairs, 2);
+  assert.deepEqual(plain(report.meters.map(v => Math.round(v * 100) / 100)), [0, 10, 2]);
+  assert.equal(report.worst, 1);
+  assert.equal(report.max, 10);
+  assert.equal(T.worstResidualIndex(report.meters), 1);
+  assert.equal(T.worstResidualIndex([]), -1);
+});
+
+test("suggestAB returns the endpoints of the longest mask component", () => {
+  const img = image(80, 40);
+  polyline(img, [[5, 10], [40, 10], [40, 30], [10, 30]], BLUE);
+  polyline(img, [[60, 5], [70, 5], [70, 10]], [200, 40, 40]);
+  const M = T.buildMask(img, BLUE, 60);
+  const ab = T.suggestAB(M);
+  assert.ok(ab && ab.A && ab.B, "expected endpoints");
+  const near = (p, x, y, r = 3) => Math.hypot(p[0] - x, p[1] - y) <= r;
+  const ends = [ab.A, ab.B];
+  assert.ok(ends.some(p => near(p, 5, 10)) && ends.some(p => near(p, 10, 30)), "ends " + JSON.stringify(ends));
+  assert.ok(ab.size > 20);
+  const empty = T.buildMask(image(20, 20), BLUE, 60);
+  assert.equal(T.suggestAB(empty), null);
+});

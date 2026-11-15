@@ -140,5 +140,86 @@ async function alignImages(srcImg,dstImg,opts={}){
  // Map downscaled-src pixels → downscaled-dst pixels; callers convert with scaleX/scaleY.
  return{ok:true,confidence:Math.max(0,Math.min(1,score.ncc)),transform:T,ncc:score.ncc,peak,overlap:score.overlap,residual:score.residual,reason:'ok',srcScaleX:srcFit.scaleX,srcScaleY:srcFit.scaleY,dstScaleX:dstFit.scaleX,dstScaleY:dstFit.scaleY,srcSize:{w:sw,h:sh},dstSize:{w:dw,h:dh}};
 }
-root.GildamTraceModel={apply,invert,scaleAround,rotateAround,translate,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx,fitLongSide,resizeRgba,alignImages};
+
+/* Line-color suggestion, map-road snap, per-pair residuals, and A/B endpoints (browser only).
+   SUGGEST_MIN_SAT (0.22) / SUGGEST_MIN_CHROMA (25): ignore paper, grey print and pale washes.
+   SUGGEST_MIN_CONTRAST (18): keep edge-like pixels so fills score lower than drawn lines.
+   SUGGEST_MAX_FRAC (0.15): drop clusters that cover too much of the image (background).
+   SUGGEST_MIN_PIXELS (40): skip speckles.
+   SNAP_MAP_RADIUS_PX (16): screen-pixel radius for snapping a control point to a road.
+   SNAP_MAP_MAX_METERS (60): also reject snaps that are geographically far (low zoom). */
+const SUGGEST_MIN_SAT=.22,SUGGEST_MIN_CHROMA=25,SUGGEST_MIN_CONTRAST=18,SUGGEST_MAX_FRAC=.15,SUGGEST_MIN_PIXELS=40;
+const SNAP_MAP_RADIUS_PX=16,SNAP_MAP_MAX_METERS=60;
+function suggestLineColor(img,opts={}){
+ if(!img?.width||!img.height)return null;
+ const{width:w,height:h,data}=img,stride=opts.stride||Math.max(1,Math.floor(Math.max(w,h)/400));
+ const minSat=opts.minSat??SUGGEST_MIN_SAT,minChroma=opts.minChroma??SUGGEST_MIN_CHROMA,minContrast=opts.minContrast??SUGGEST_MIN_CONTRAST;
+ const maxFrac=opts.maxFrac??SUGGEST_MAX_FRAC,minPixels=opts.minPixels??SUGGEST_MIN_PIXELS;
+ const buckets=new Map();let sampled=0;
+ for(let y=1;y<h-1;y+=stride)for(let x=1;x<w-1;x+=stride){
+  const i=(y*w+x)*4;if(data[i+3]<128)continue;
+  const R=data[i],G=data[i+1],Bl=data[i+2],mx=Math.max(R,G,Bl),mn=Math.min(R,G,Bl),sat=mx?(mx-mn)/mx:0,chroma=mx-mn;
+  if(sat<minSat||chroma<minChroma)continue;
+  let contrast=0,nc=0;for(const[dx,dy] of [[-stride,0],[stride,0],[0,-stride],[0,stride]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const j=(ny*w+nx)*4;contrast+=Math.hypot(R-data[j],G-data[j+1],Bl-data[j+2]);nc++;}
+  contrast=nc?contrast/nc:0;if(contrast<minContrast)continue;
+  const key=((R>>3)<<10)|((G>>3)<<5)|(Bl>>3);let bu=buckets.get(key);if(!bu){bu={sr:0,sg:0,sb:0,n:0,sc:0};buckets.set(key,bu);}
+  const wgt=sat*chroma*contrast;bu.sr+=R*wgt;bu.sg+=G*wgt;bu.sb+=Bl*wgt;bu.n++;bu.sc+=wgt;sampled++;
+ }
+ if(!buckets.size)return null;
+ const sampledAll=Math.ceil(w/stride)*Math.ceil(h/stride);
+ let best=null,bestScore=-1;
+ for(const[key,bu]of buckets){
+  if(bu.n<Math.max(3,Math.ceil(minPixels/(stride*stride))))continue;
+  if(bu.n/sampledAll>maxFrac)continue;
+  let n=bu.n,sr=bu.sr,sg=bu.sg,sb=bu.sb,sc=bu.sc;
+  const kR=key>>10,kG=(key>>5)&31,kB=key&31;
+  for(const[k2,b2]of buckets){if(k2===key)continue;const r2=k2>>10,g2=(k2>>5)&31,b2c=k2&31;if(Math.max(Math.abs(kR-r2),Math.abs(kG-g2),Math.abs(kB-b2c))>1)continue;n+=b2.n;sr+=b2.sr;sg+=b2.sg;sb+=b2.sb;sc+=b2.sc;}
+  const score=sc*Math.log(1+n);
+  if(score>bestScore){bestScore=score;best={color:[Math.round(sr/sc),Math.round(sg/sc),Math.round(sb/sc)],count:n,score,sat:null};}
+ }
+ return best;
+}
+function pointOnSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(!(l2>0))return{x:ax,y:ay,t:0,d:Math.hypot(px-ax,py-ay)};const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l2));return{x:ax+t*dx,y:ay+t*dy,t,d:Math.hypot(px-(ax+t*dx),py-(ay+t*dy))};}
+function segIntersect(a,b,c,d){const r=b[0]-a[0],s=b[1]-a[1],p=d[0]-c[0],q=d[1]-c[1],den=r*q-s*p;if(Math.abs(den)<1e-12)return null;const t=((c[0]-a[0])*q-(c[1]-a[1])*p)/den,u=((c[0]-a[0])*s-(c[1]-a[1])*r)/den;if(t<0||t>1||u<0||u>1)return null;return{x:a[0]+t*r,y:a[1]+t*s};}
+function snapToPolylines(px,py,polylines,opts={}){
+ const radius=opts.radius??SNAP_MAP_RADIUS_PX;if(!(radius>0)||!Array.isArray(polylines))return{ok:false};
+ const qk=(x,y)=>Math.round(x)+','+Math.round(y),deg=new Map(),segs=[];
+ const bump=(x,y,id)=>{const k=qk(x,y);let s=deg.get(k);if(!s){s={n:0,ids:new Set(),x,y};deg.set(k,s);}s.n++;s.ids.add(id);};
+ let bestEdge=null,bestVtx=null,bestX=null;
+ for(let pi=0;pi<polylines.length;pi++){const line=polylines[pi];if(!line||line.length<2)continue;
+  for(let i=0;i<line.length;i++){const[x,y]=line[i],d=Math.hypot(px-x,py-y);if(d<=radius&&(!bestVtx||d<bestVtx.d))bestVtx={ok:true,x,y,dist:d,kind:'vertex',d};
+   if(i){const a=line[i-1],b=line[i];bump(a[0],a[1],pi);bump(x,y,pi);const hit=pointOnSeg(px,py,a[0],a[1],x,y);if(hit.d<=radius&&(!bestEdge||hit.d<bestEdge.d))bestEdge={ok:true,x:hit.x,y:hit.y,dist:hit.d,kind:'edge',d:hit.d};
+    if(Math.max(Math.abs(px-(a[0]+b[0])/2)-Math.abs(b[0]-a[0])/2,0)**2+Math.max(Math.abs(py-(a[1]+b[1])/2)-Math.abs(b[1]-a[1])/2,0)**2<=radius*radius)segs.push({a,b,id:pi});}}
+ }
+ for(const s of deg.values()){if(s.n<3&&s.ids.size<2)continue;const d=Math.hypot(px-s.x,py-s.y);if(d<=radius&&(!bestX||d<bestX.d))bestX={ok:true,x:s.x,y:s.y,dist:d,kind:'intersection',d};}
+ for(let i=0;i<segs.length;i++)for(let j=i+1;j<segs.length;j++){if(segs[i].id===segs[j].id)continue;const cr=segIntersect(segs[i].a,segs[i].b,segs[j].a,segs[j].b);if(!cr)continue;const d=Math.hypot(px-cr.x,py-cr.y);if(d<=radius&&(!bestX||d<bestX.d))bestX={ok:true,x:cr.x,y:cr.y,dist:d,kind:'intersection',d};}
+ // T-junction: a vertex of one line lying on another line.
+ for(const s of segs)for(const[k,v]of deg){if(v.ids.size===1&&[...v.ids][0]===s.id)continue;const hit=pointOnSeg(v.x,v.y,s.a[0],s.a[1],s.b[0],s.b[1]);if(hit.d>1.25)continue;const d=Math.hypot(px-hit.x,py-hit.y);if(d<=radius&&(!bestX||d<bestX.d))bestX={ok:true,x:hit.x,y:hit.y,dist:d,kind:'intersection',d};}
+ if(bestX)return{ok:true,x:bestX.x,y:bestX.y,dist:bestX.dist,kind:'intersection'};
+ if(bestVtx&&(!bestEdge||bestVtx.d<=bestEdge.d+2.5))return{ok:true,x:bestVtx.x,y:bestVtx.y,dist:bestVtx.dist,kind:'vertex'};
+ if(bestEdge)return{ok:true,x:bestEdge.x,y:bestEdge.y,dist:bestEdge.dist,kind:'edge'};
+ return{ok:false};
+}
+function pairResidualMeters(T,pairs,metersPerUnit){
+ const raw=residuals(T,pairs||[]),meters=raw.map(r=>r*(metersPerUnit||0));
+ let worst=-1,max=0,sum=0;for(let i=0;i<meters.length;i++){sum+=meters[i];if(worst<0||meters[i]>max){max=meters[i];worst=i;}}
+ return{raw,meters,worst:meters.length?worst:-1,max:meters.length?max:0,avg:meters.length?sum/meters.length:0,count:meters.length};
+}
+function worstResidualIndex(meters){let w=-1,m=-1;for(let i=0;i<(meters||[]).length;i++)if(w<0||meters[i]>m){m=meters[i];w=i;}return w;}
+function suggestAB(M){
+ if(!M?.mask||!M.count||!M.width)return null;
+ const{mask,width:w,height:h}=M,lab=new Int32Array(w*h),qx=new Int32Array(w*h),qy=new Int32Array(w*h);
+ let bestId=0,bestN=0,nComp=0;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!mask[i]||lab[i])continue;const id=++nComp;let n=0,hs=0,qe=0;qx[0]=x;qy[0]=y;qe=1;lab[i]=id;
+  while(hs<qe){const cx=qx[hs],cy=qy[hs++];n++;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const j=ny*w+nx;if(!mask[j]||lab[j])continue;lab[j]=id;qx[qe]=nx;qy[qe]=ny;qe++;}}
+  if(n>bestN){bestN=n;bestId=id;}}
+ if(bestN<8)return null;
+ function farthest(sx,sy){const dist=new Int32Array(w*h);for(let i=0;i<dist.length;i++)dist[i]=-1;let hs=0,qe=0,fx=sx,fy=sy,best=0;qx[0]=sx;qy[0]=sy;dist[sy*w+sx]=0;qe=1;
+  while(hs<qe){const cx=qx[hs],cy=qy[hs++],d=dist[cy*w+cx];if(d>=best){best=d;fx=cx;fy=cy;}for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;const j=ny*w+nx;if(lab[j]!==bestId||dist[j]>=0)continue;dist[j]=d+1;qx[qe]=nx;qy[qe]=ny;qe++;}}
+  return{pixel:[fx,fy],dist:best};}
+ let sx=-1,sy=-1;for(let i=0;i<lab.length;i++)if(lab[i]===bestId){sx=i%w;sy=i/w|0;break;}
+ const a=farthest(sx,sy),b=farthest(a.pixel[0],a.pixel[1]);
+ return{A:a.pixel,B:b.pixel,size:bestN,span:b.dist};
+}
+root.GildamTraceModel={apply,invert,scaleAround,rotateAround,translate,fitSimilarity,residuals,pickColor,buildMask,snapToMask,tracePath,bridgedRuns,simplify,meters,length,sampleAlong,deviation,toGpx,fitLongSide,resizeRgba,alignImages,suggestLineColor,snapToPolylines,pairResidualMeters,worstResidualIndex,suggestAB,SNAP_MAP_RADIUS_PX,SNAP_MAP_MAX_METERS};
 })(typeof window!=='undefined'?window:globalThis);

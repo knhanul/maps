@@ -112,3 +112,14 @@ kbd{font:11px/1 ui-monospace,monospace;border:1px solid #cbd0cc;border-bottom-wi
 #traceAlignAuto{font-weight:700;background:#3c2a7a;color:#fff;border-color:#3c2a7a}
 #traceAlignAuto[aria-busy=true]{cursor:wait}
 #traceAlignUndo{background:#fff}
+.trace-suggest{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid #c9d3cc;border-radius:12px;background:#f4f0ff;font-size:13px;font-weight:600;color:#3c2a7a}
+.trace-suggest .trace-swatch{width:36px;height:16px}
+.trace-suggest button{border:1px solid #3c2a7a;background:#3c2a7a;color:#fff;border-radius:10px;padding:6px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.trace-suggest button[id$=Ignore]{background:#fff;color:#3c2a7a}
+.trace-residuals{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.trace-residuals button,.trace-res{border:1px solid #c9d3cc;background:#fff;border-radius:999px;padding:3px 8px;font:inherit;font-size:12px;font-weight:600;color:#33403a;cursor:default}
+.trace-res.worst,.trace-residuals .worst{background:#fdecea;border-color:#d0021b;color:#8e1b14;font-weight:700}
+.trace-pair{width:20px;height:20px;border-radius:10px;background:#fff;color:#d0021b;font:700 11px/20px system-ui;text-align:center;text-shadow:none;box-shadow:0 0 0 2px #d0021b,0 1px 4px #0004;pointer-events:none}
+.trace-pair.worst{width:26px;height:26px;line-height:26px;background:#d0021b;color:#fff;box-shadow:0 0 0 3px #fff,0 0 0 5px #d0021b,0 1px 6px #0005;font-size:13px}
+.trace-mark.suggest{opacity:.9;box-shadow:0 0 0 2px #fff,0 0 0 4px #7b3fe4;background:#5b3cc4}
+#tracePairRepick{font-weight:700}

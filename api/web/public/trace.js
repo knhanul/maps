@@ -34,7 +34,7 @@ async function loadFile(file){if(!file)return;if(!/^image\//.test(file.type||'im
   if(pr.width&&pr.width<cw*.6){x0=Math.min(cw*.5,pr.right-cr.left);const lr=$('layers')?.getBoundingClientRect();if(lr?.width&&lr.left-cr.left>x0+200)x1=lr.left-cr.left-10;}else if(pr.height)y1=Math.max(ch*.3,pr.top-cr.top);
   const pad=.08,tl=merc(m.unproject([x0+(x1-x0)*pad,y0+(y1-y0)*pad])),br=merc(m.unproject([x1-(x1-x0)*pad,y1-(y1-y0)*pad])),s=Math.min((br[0]-tl[0])/w,(br[1]-tl[1])/h),cx=(tl[0]+br[0])/2,cy=(tl[1]+br[1])/2;
   st.T={a:s,b:0,tx:cx-s*w/2,ty:cy-s*h/2};st.baseS=s;st.emphasize=true;ensureLayers();setOverlay();
-  status(`${file.name||'이미지'} · ${w}×${h}px${k<1?' (처리용으로 축소)':''}. 이제 위치를 맞추세요: [자동 맞춤 시도]로 먼저 겹쳐 보거나, [기준점 추가]로 이미지와 지도의 같은 지점을 2곳 이상 짝지으면 정확히 겹칩니다.`);render();}
+  st.colorSuggest=T.suggestLineColor(st.img);status(`${file.name||'이미지'} · ${w}×${h}px${k<1?' (처리용으로 축소)':''}. 이제 위치를 맞추세요: [자동 맞춤 시도]로 먼저 겹쳐 보거나, [기준점 추가]로 이미지와 지도의 같은 지점을 2곳 이상 짝지으면 정확히 겹칩니다.${st.colorSuggest?' 선 색 추천이 있습니다.':''}`);render();}
  catch(e){status('이미지를 읽지 못했습니다: '+e.message,true);}}
 /* ---------- 2. align: drag handles + control-point pairs ---------- */
 function handleEl(cls,title){const el=document.createElement('div');el.className='trace-handle '+cls;el.title=title;return el;}
@@ -113,30 +113,55 @@ async function autoAlign(){
 function undoAlign(){if(!st?.alignUndo)return;const u=st.alignUndo;st.T=u.T;st.pairs=u.pairs||[];st.fitError=u.fitError||null;st.alignUndo=null;setOverlay();status('자동 맞춤을 되돌렸습니다. 기준점 또는 패널 조절로 다시 맞출 수 있습니다.');render();}
 
 function startPair(){if(!st)return;st.mode='pairImg';st.pending=null;if(st.emphasize==null)st.emphasize=true;setOverlay();status('① 이미지에서 알아보기 쉬운 지점을 누르세요. (이미지 점 → 지도 점, 최소 2곳). 구분이 어려우면 [대비 강조]를 켜 두세요.');render();}
+const ROAD_LAYER_RE=/^roads_(?:tunnels_|bridges_)?(?:other|minor|minor_service|link|major|highway)$/;
+function metersPerMerc(ll){const c=ll?{lng:ll[0],lat:ll[1]}:(map()?.getCenter?.()||{lng:127,lat:36});return 1/maplibregl.MercatorCoordinate.fromLngLat(c).meterInMercatorCoordinateUnits();}
+function recordFit(ll){if(!st.pairs.length){st.fitError=null;return;}const r=T.pairResidualMeters(st.T,st.pairs,metersPerMerc(ll));st.fitError={avg:r.avg,max:r.max,meters:r.meters,worst:r.worst};}
+function snapMapPoint(ll){
+ const m=map();if(!m?.queryRenderedFeatures||!m.project)return null;
+ const p=m.project({lng:ll[0],lat:ll[1]}),r=T.SNAP_MAP_RADIUS_PX,maxM=T.SNAP_MAP_MAX_METERS;
+ const layers=(m.getStyle()?.layers||[]).map(l=>l.id).filter(id=>ROAD_LAYER_RE.test(id)&&m.getLayer(id));
+ if(!layers.length)return null;
+ let feats=[];try{feats=m.queryRenderedFeatures([[p.x-r,p.y-r],[p.x+r,p.y+r]],{layers});}catch{return null;}
+ const lines=[];for(const f of feats){const g=f.geometry;if(!g)continue;const cs=g.type==='LineString'?[g.coordinates]:g.type==='MultiLineString'?g.coordinates:null;if(!cs)continue;for(const c of cs){if(c&&c.length>=2)lines.push(c.map(([lng,lat])=>{const q=m.project({lng,lat});return[q.x,q.y];}));}}
+ const hit=T.snapToPolylines(p.x,p.y,lines,{radius:r});if(!hit?.ok)return null;
+ const snapped=m.unproject([hit.x,hit.y]),out=[snapped.lng,snapped.lat];
+ if(maxM&&T.meters(ll,out)>maxM)return null;
+ return{ll:out,kind:hit.kind,dist:hit.dist};
+}
 function pairClick(ll){if(st.mode==='pairImg'){const[u,v]=ll2px(ll);if(u<0||v<0||u>st.img.width||v>st.img.height)return status('이미지 안의 지점을 누르세요.',true);st.pending={u,v};st.mode='pairMap';setOverlay();status(`② 바탕 지도에서 방금 고른 지점과 같은 위치를 누르세요. (이미지 ${st.pairs.length+1}곳째 → 지도, 최소 2곳). 지도가 안 보이면 투명도를 낮추거나 [대비 강조]를 끄세요.`);render();return;}
+ let snapped=null;if(st.mode==='pairMap')snapped=snapMapPoint(ll);if(snapped)ll=snapped.ll;
  const[x,y]=merc(ll);st.pairs.push({...st.pending,x,y});st.pending=null;st.mode='idle';
  try{st.T=T.fitSimilarity(st.pairs,st.T);}catch(e){st.pairs.pop();status(e.message,true);setOverlay();render();return;}
- const mpu=1/maplibregl.MercatorCoordinate.fromLngLat(ll).meterInMercatorCoordinateUnits(),res=T.residuals(st.T,st.pairs).map(r=>r*mpu);
- st.fitError=st.pairs.length?{avg:res.reduce((a,b)=>a+b,0)/res.length,max:Math.max(...res)}:null;
- setOverlay();status(st.pairs.length<2?'기준점 1곳: 위치만 옮겼습니다. 멀리 떨어진 지점을 하나 더 짝지으면 크기·회전까지 맞춥니다.':`기준점 ${st.pairs.length}곳으로 맞췄습니다 · 평균 오차 ${Math.round(st.fitError.avg)}m, 최대 ${Math.round(st.fitError.max)}m${st.fitError.max>100?' — 오차가 크면 기준점을 지우고 다시 찍어 보세요.':''}`);render();}
+ recordFit(ll);setOverlay();
+ const snapTxt=snapped?' · 스냅됨'+(snapped.kind==='intersection'?'(교차로)':snapped.kind==='vertex'?'(도로 끝)':'(도로)') :'';
+ status(st.pairs.length<2?'기준점 1곳: 위치만 옮겼습니다. 멀리 떨어진 지점을 하나 더 짝지으면 크기·회전까지 맞춥니다.'+snapTxt:`기준점 ${st.pairs.length}곳으로 맞췄습니다 · 평균 오차 ${Math.round(st.fitError.avg)}m, 최대 ${Math.round(st.fitError.max)}m${st.fitError.max>100?' — 오차가 큰 점을 다시 찍어 보세요.':''}`+snapTxt);render();}
+function repickPair(i){if(!st||i==null||i<0||i>=st.pairs.length)return;st.pairs.splice(i,1);if(st.pairs.length){try{st.T=T.fitSimilarity(st.pairs,st.T);}catch{}}recordFit();st.pending=null;setOverlay();startPair();status(`오차가 큰 기준점(${i+1}번)을 지웠습니다. 같은 지점을 이미지 → 지도 순으로 다시 짝지으세요.`);}
 /* ---------- 3. colour ---------- */
 function startPick(){if(!st)return;st.mode='color';status('추출할 선(파란 선, 노란 선 등)을 누르세요.');render();}
-function colorClick(ll){const[u,v]=ll2px(ll);try{st.color=T.pickColor(st.img,u,v,4);}catch(e){return status(e.message,true);}st.mode='idle';rebuildMask();if(!st.A)st.mode='A';render();}
-function rebuildMask(){if(!st.color)return;st.maskInfo=T.buildMask(st.img,st.color,st.tol);st.result=st.snapped=null;drawMask();updateLines();const pct=st.maskInfo.count/(st.img.width*st.img.height)*100;
- status(`선 색 rgb(${st.color.join(',')}) · 인식 픽셀 ${st.maskInfo.count.toLocaleString()}개 (${pct.toFixed(1)}%)${pct>15?' — 너무 많이 잡힙니다. 허용 범위를 줄이세요.':pct<.05?' — 거의 잡히지 않습니다. 허용 범위를 늘리세요.':''}${st.A?'':' · 다음: 출발점(A)을 선 위에 누르세요.'}`);}
+function colorClick(ll){const[u,v]=ll2px(ll);try{st.color=T.pickColor(st.img,u,v,4);}catch(e){return status(e.message,true);}st.mode='idle';st.colorDismissed=true;rebuildMask();if(!st.A&&!st.abSuggest)st.mode='A';placeMarks();render();}
+function acceptSuggestedColor(){if(!st?.colorSuggest?.color||st.locked)return;st.color=st.colorSuggest.color.slice();st.mode='idle';rebuildMask();if(!st.A&&!st.abSuggest)st.mode='A';placeMarks();render();}
+function ignoreSuggestedColor(){if(!st)return;st.colorDismissed=true;status('지도에서 추출할 선(파란 선, 노란 선 등)을 누르거나 [지도에서 선 누르기]를 쓰세요.');render();}
+function rebuildMask(){if(!st.color)return;st.maskInfo=T.buildMask(st.img,st.color,st.tol);st.result=st.snapped=null;
+ if(st.A||st.B||st.abDismissed)st.abSuggest=null;else st.abSuggest=T.suggestAB(st.maskInfo)||null;
+ drawMask();updateLines();const pct=st.maskInfo.count/(st.img.width*st.img.height)*100;
+ const tail=st.A?'':(st.abSuggest?' 이 지점을 출발/도착으로 사용할까요?':' · 다음: 출발점(A)을 선 위에 누르세요.');
+ status(`선 색 rgb(${st.color.join(',')}) · 인식 픽셀 ${st.maskInfo.count.toLocaleString()}개 (${pct.toFixed(1)}%)${pct>15?' — 너무 많이 잡힙니다. 허용 범위를 줄이세요.':pct<.05?' — 거의 잡히지 않습니다. 허용 범위를 늘리세요.':''}${tail}`);}
+function acceptSuggestedAB(){if(!st?.abSuggest||st.A||st.B)return;st.A=st.abSuggest.A;st.B=st.abSuggest.B;st.abSuggest=null;st.mode='idle';st.result=st.snapped=null;updateLines();placeMarks();status('추천한 출발·도착을 적용했습니다. [선 따라 추출]을 누르세요. 엉뚱하면 출발 A·도착 B로 다시 찍으세요.');render();}
+function ignoreSuggestedAB(){if(!st)return;st.abSuggest=null;st.abDismissed=true;if(!st.A)st.mode='A';placeMarks();status('출발점(A)을 선 위에 누르세요.');render();}
 function drawMask(){const m=map();if(!st?.maskInfo){if(m.getLayer('trace-mask')){m.removeLayer('trace-mask');m.removeSource('trace-mask');}return;}
  const{width:w,height:h,mask}=st.maskInfo,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d'),d=g.createImageData(w,h);for(let i=0;i<mask.length;i++)if(mask[i]){d.data[i*4]=255;d.data[i*4+1]=0;d.data[i*4+2]=200;d.data[i*4+3]=200;}g.putImageData(d,0,0);const url=c.toDataURL('image/png');
  if(m.getSource('trace-mask')){m.getSource('trace-mask').updateImage({url,coordinates:corners()});}else{m.addSource('trace-mask',{type:'image',url,coordinates:corners()});m.addLayer({id:'trace-mask',type:'raster',source:'trace-mask',paint:{'raster-opacity':.8,'raster-fade-duration':0}},'trace-line');}
  m.setLayoutProperty('trace-mask','visibility',$('traceShowMask').checked?'visible':'none');}
 /* ---------- 4. A / B / via ---------- */
 function pointClick(ll){const[u,v]=ll2px(ll),p=T.snapToMask(st.maskInfo,u,v,15);if(!p)return status('고른 색의 선 가까이를 누르세요. (안 잡히면 허용 범위를 늘리세요)',true);
- if(st.mode==='A'){st.A=p;st.mode=st.B?'idle':'B';status(st.B?'출발점을 바꿨습니다.':'다음: 도착점(B)을 선 위에 누르세요.');}
- else if(st.mode==='B'){st.B=p;st.mode='idle';status('출발·도착을 정했습니다. [선 따라 추출]을 누르세요. 엉뚱한 길로 가면 경유점을 가는 순서대로 추가하세요.');}
+ if(st.mode==='A'){st.A=p;st.abSuggest=null;st.mode=st.B?'idle':'B';status(st.B?'출발점을 바꿨습니다.':'다음: 도착점(B)을 선 위에 누르세요.');}
+ else if(st.mode==='B'){st.B=p;st.abSuggest=null;st.mode='idle';status('출발·도착을 정했습니다. [선 따라 추출]을 누르세요. 엉뚱한 길로 가면 경유점을 가는 순서대로 추가하세요.');}
  else{st.vias.push(p);status(`경유점 ${st.vias.length}개 · 가는 순서대로 추가하세요. 추가 후 [선 따라 추출]을 다시 누르세요.`);}
  st.result=st.snapped=null;updateLines();placeMarks();render();}
 function placeMarks(){marks.forEach(x=>x.remove());marks=[];if(!st||!B.inCourse())return;const m=map(),add=(p,label,cls)=>{const el=document.createElement('div');el.className='trace-mark '+cls;el.textContent=label;marks.push(new maplibregl.Marker({element:el}).setLngLat(px2ll(p[0]+.5,p[1]+.5)).addTo(m));};
  if(st.A)add(st.A,'A','a');if(st.B)add(st.B,'B','b');st.vias.forEach((p,i)=>add(p,String(i+1),'via'));
- st.pairs.forEach((p,i)=>{const el=document.createElement('div');el.className='trace-pair';el.title=`기준점 ${i+1}`;el.textContent='+';marks.push(new maplibregl.Marker({element:el}).setLngLat(lngLat([p.x,p.y])).addTo(m));});}
+ if(!st.A&&!st.B&&st.abSuggest){add(st.abSuggest.A,'A?','a suggest');add(st.abSuggest.B,'B?','b suggest');}
+ st.pairs.forEach((p,i)=>{const el=document.createElement('div'),worst=st.pairs.length>=2&&st.fitError?.worst===i,mtr=st.fitError?.meters?.[i];el.className='trace-pair'+(worst?' worst':'');el.title=mtr==null?`기준점 ${i+1}`:`기준점 ${i+1} · 오차 ${Math.round(mtr)}m${worst?' · 이 점 다시 찍기':''}`;el.textContent=String(i+1);marks.push(new maplibregl.Marker({element:el}).setLngLat(lngLat([p.x,p.y])).addTo(m));});}
 /* ---------- 5. extract ---------- */
 async function extract(){if(!st?.maskInfo||!st.A||!st.B)return status('선 색, 출발점(A), 도착점(B)을 먼저 정하세요.',true);busy=true;render();status('선을 따라가는 중…');await new Promise(r=>setTimeout(r,30));
  try{const stops=[st.A,...st.vias,st.B];let path=[],bridged=[];for(let i=1;i<stops.length;i++){const r=T.tracePath(st.maskInfo,stops[i-1],stops[i],{gapCost:st.gapCost});path=path.concat(i>1?r.path.slice(1):r.path);bridged=bridged.concat(i>1?r.bridged.slice(1):r.bridged);}
@@ -182,21 +207,34 @@ function render(){const has=!!st,el=$('traceTools');el.classList.toggle('has-ima
  if(st.mode==='pairImg')guide.innerHTML=`다음: <b>이미지</b>에서 ${n+1}번째 지점을 누르세요. 순서: 이미지 점 → 지도 점 (현재 ${n}곳 / 최소 2곳).`;
  else if(st.mode==='pairMap')guide.innerHTML=`다음: <b>바탕 지도</b>에서 방금 고른 지점과 같은 위치를 누르세요. (이미지 ${n+1}곳째 → 지도, 최소 2곳)`;
  else if(n<2)guide.innerHTML=`순서: <b>이미지 점 → 지도 점</b>. 같은 지점을 최소 2곳 짝지으면 크기·회전까지 자동으로 맞춥니다. 현재 ${n}곳.`;
- else guide.innerHTML=`기준점 ${n}곳. 오차가 크면 지우고 멀리 떨어진 지점을 다시 짝지으세요. 지도를 확대해도 위의 크기·회전·위치 버튼은 그대로 쓸 수 있습니다.`;
+ else guide.innerHTML=`기준점 ${n}곳. 오차가 큰 점은 아래 목록에서 강조됩니다. [이 점 다시 찍기]로 그 점만 다시 짝지울 수 있습니다.`;
  const err=$('traceFitError');
  if(n===1){err.hidden=false;err.classList.remove('warn');err.textContent='맞춤 상태: 위치만 반영됨 · 크기·회전을 맞추려면 지점 1곳이 더 필요합니다.';}
  else if(n>=2&&st.fitError){err.hidden=false;err.classList.toggle('warn',st.fitError.max>80);err.textContent=`맞춤 오차 평균 ${Math.round(st.fitError.avg)}m · 최대 ${Math.round(st.fitError.max)}m${st.fitError.max>80?' — 오차가 큽니다. 기준점을 다시 찍어 주세요.':''}`;}
  else{err.hidden=true;err.textContent='';err.classList.remove('warn');}
+ const resBox=$('tracePairResiduals'),repickRow=$('tracePairRepickRow'),repick=$('tracePairRepick');
+ if(resBox){if(n>=2&&st.fitError?.meters){resBox.hidden=false;resBox.innerHTML=st.fitError.meters.map((mtr,i)=>{const w=i===st.fitError.worst;return `<span class="trace-res${w?' worst':''}">${i+1}번 ${Math.round(mtr)}m${w?' · 가장 큼':''}</span>`;}).join('');}
+  else{resBox.hidden=true;resBox.innerHTML='';}}
+ if(repickRow){const show=n>=2&&st.fitError?.worst>=0&&!st.locked&&!busy;repickRow.hidden=!show;if(repick){repick.disabled=!show;repick.textContent=show?`${st.fitError.worst+1}번 점 다시 찍기`:'이 점 다시 찍기';}}
+ const sug=$('traceColorSuggest'),showSug=!!(st.colorSuggest?.color&&!st.color&&!st.colorDismissed);
+ if(sug)sug.hidden=!showSug;if(showSug&&$('traceSuggestSwatch'))$('traceSuggestSwatch').style.background=`rgb(${st.colorSuggest.color.join(',')})`;
+ const ab=$('traceABSuggest');if(ab)ab.hidden=!(st.abSuggest&&!st.A&&!st.B&&st.mode!=='A'&&st.mode!=='B'&&st.mode!=='via');
  for(const id of ['traceScaleDown','traceScaleUp','traceScale','traceRotL5','traceRotL1','traceRotR1','traceRotR5','traceNudgeUp','traceNudgeLeft','traceNudgeRight','traceNudgeDown'])$(id).disabled=st.locked||busy;
 
  if(!$('traceMode').dataset.touched)$('traceMode').value=B.mode();
  map()?.getCanvas&&(map().getCanvas().style.cursor=['pairImg','pairMap','color','A','B','via'].includes(st.mode)?'crosshair':'');}
 function setMode(m){if(!st)return;st.mode=st.mode===m?'idle':m;if(st.mode==='idle'&&(m==='pairImg'||m==='pairMap')){st.pending=null;setOverlay();}
+ if(st.mode==='A'||st.mode==='B'||st.mode==='via'){/* keep abSuggest markers only until the user actually sets A/B */}
  if(st.mode==='A')status('출발점(A)을 선 위에 누르세요.');else if(st.mode==='B')status('도착점(B)을 선 위에 누르세요.');else if(st.mode==='via')status('경유점을 가는 순서대로 선 위에 누르세요.');render();}
 $('traceFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)loadFile(f);};
 $('traceOpacity').oninput=e=>{if(!st)return;st.opacity=Number(e.target.value)/100;syncOpacityUi();applyImageStyle();};
 $('tracePair').onclick=()=>st&&(st.mode==='pairImg'||st.mode==='pairMap'?(st.mode='idle',st.pending=null,setOverlay(),render()):startPair());
 $('tracePairReset').onclick=()=>{if(!st)return;st.pairs=[];st.fitError=null;st.pending=null;if(st.mode==='pairImg'||st.mode==='pairMap')st.mode='idle';placeMarks();applyImageStyle();status('기준점을 지웠습니다. 현재 위치는 유지합니다.');render();};
+$('tracePairRepick').onclick=()=>{if(st?.fitError?.worst>=0)repickPair(st.fitError.worst);};
+$('traceColorUse').onclick=()=>acceptSuggestedColor();
+$('traceColorIgnore').onclick=()=>ignoreSuggestedColor();
+$('traceABUse').onclick=()=>acceptSuggestedAB();
+$('traceABIgnore').onclick=()=>ignoreSuggestedAB();
 $('traceLock').onclick=()=>{if(!st)return;st.locked=!st.locked;placeHandles();render();};
 $('traceAlignAuto').onclick=()=>autoAlign();
 $('traceAlignUndo').onclick=()=>undoAlign();
@@ -230,6 +268,6 @@ document.addEventListener('keydown',e=>{
  e.preventDefault();
 });
 window.__trace={mapClick,setVisible:v=>{if(!st)return;[...handles,...marks].forEach(x=>x.getElement().style.display=v?'':'none');const m=map();for(const id of ['trace-img','trace-mask','trace-line','trace-snap','trace-warn'])if(m?.getLayer(id)&&!(id==='trace-mask'&&!$('traceShowMask').checked))m.setLayoutProperty(id,'visibility',v?'visible':'none');if(v){placeHandles();placeMarks();}},get active(){return !!st;}};
-window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router,setScalePct,rotateBy,nudgeByPixels,applyImageStyle,scalePct,autoAlign,undoAlign,setCapture:fn=>{captureOverride=fn||null;},captureMapView};
+window.__traceTest={loadFile,get state(){return st;},setTransform:t=>{st.T=t;setOverlay();},pairClick,colorClick,pointClick,setMode,extract,roadSnap,openEditor,router,setScalePct,rotateBy,nudgeByPixels,applyImageStyle,scalePct,autoAlign,undoAlign,setCapture:fn=>{captureOverride=fn||null;},captureMapView,acceptSuggestedColor,ignoreSuggestedColor,acceptSuggestedAB,ignoreSuggestedAB,repickPair,snapMapPoint,recordFit};
 render();
 })();

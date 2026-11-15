@@ -119,6 +119,23 @@ await step("auto-align: injected map image succeeds, is undoable, and noise is r
   }
 });
 
+await step("line color suggestion can be accepted and does not upload the image", async () => {
+  assert.equal(await page.locator("#traceColorSuggest").isVisible(), true);
+  assert.match(await page.locator("#traceColorSuggest").innerText(), /이 색으로 추출할까요/);
+  const before = calls.length;
+  await page.click("#traceColorUse");
+  const s = await page.evaluate(() => ({ c: __traceTest.state.color, n: __traceTest.state.maskInfo?.count, sug: !document.getElementById("traceColorSuggest").hidden, ab: !document.getElementById("traceABSuggest").hidden, A: !!__traceTest.state.A }));
+  assert.ok(s.c && s.c[2] > 180 && s.c[0] < 90, "suggested blue " + s.c);
+  assert.ok(s.n > 100, "mask count " + s.n);
+  assert.equal(s.sug, false);
+  assert.equal(s.A, false, "must not override A/B before the user confirms");
+  assert.equal(s.ab, true, "A/B recommendation shown after mask");
+  assert.match(await page.locator("#traceABSuggest").innerText(), /이 지점을 출발\/도착으로 사용할까요/);
+  assert.equal(calls.length, before);
+  await page.click("#traceABIgnore");
+  assert.equal(await page.evaluate(() => !__traceTest.state.A && !__traceTest.state.B && document.getElementById("traceABSuggest").hidden), true);
+});
+
 await step("align with two control-point pairs via real map clicks (scale + rotation solved)", async () => {
   for (const [u, v] of [[80, 480], [780, 120]]) {
     await page.click("#tracePair");
@@ -130,6 +147,9 @@ await step("align with two control-point pairs via real map clicks (scale + rota
   assert.equal(st.n, 2); assert.match(st.txt, /기준점 2곳으로 맞췄습니다/);
   const errM = await page.evaluate(([A, B]) => { let mx = 0; for (const [u, v] of [[0, 0], [900, 0], [900, 560], [0, 560]]) { const p = [A.a * u - A.b * v + A.tx, A.b * u + A.a * v + A.ty], q = [B.a * u - B.b * v + B.tx, B.b * u + B.a * v + B.ty]; mx = Math.max(mx, Math.hypot(p[0] - q[0], p[1] - q[1]) / maplibregl.MercatorCoordinate.fromLngLat([127.7, 36.4]).meterInMercatorCoordinateUnits()); } return mx; }, [st.T, truth]);
   assert.ok(errM < 250, "corner error " + Math.round(errM) + " m (screen-click rounding at zoom 10.6)");
+  assert.equal(await page.locator("#tracePairResiduals").isVisible(), true);
+  assert.match(await page.locator("#tracePairResiduals").innerText(), /번 .*m/);
+  assert.equal(await page.locator("#tracePairRepick").isVisible(), true);
   await page.evaluate(t => __traceTest.setTransform(t), truth); // exact for the rest of the run
   await shot(page, "trace-2-aligned.png");
 });
@@ -194,7 +214,9 @@ await step("open in GPX editor: point editing works, overlay stays for compariso
 await step("download produces a valid GPX", async () => {
   await page.evaluate(c => __map.jumpTo({ center: c, zoom: 10.5, padding: { left: 400, top: 40, right: 260, bottom: 40 } }), await pxToLL(truth, 450, 280));
   await page.evaluate(() => __traceTest.loadFile(window.__qaFile)); await page.evaluate(t => __traceTest.setTransform(t), truth);
-  await page.click("#tracePick"); await clickLL(await pxToLL(truth, 470, 128)); await clickLL(truthLL[0]); await clickLL(truthLL.at(-1));
+  await page.click("#tracePick"); await clickLL(await pxToLL(truth, 470, 128));
+  if (await page.locator("#traceABSuggest").isVisible()) await page.click("#traceABIgnore");
+  await clickLL(truthLL[0]); await clickLL(truthLL.at(-1));
   await page.click("#traceExtract"); await page.waitForFunction(() => __traceTest.state.result);
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#traceDownload")]);
   const text = await (await dl.createReadStream()).toArray().then(b => Buffer.concat(b).toString("utf8"));
