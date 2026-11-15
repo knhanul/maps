@@ -7,6 +7,7 @@
 ## 엔드포인트 (모두 `Authorization: Bearer <access_token>`)
 | | |
 |---|---|
+| `GET /v1/weather/now?lat=&lon=` | 현재 날씨 (아래 참고) |
 | `GET /v1/me` | `{sub, brand_id, brand_role, created_at, track_count, cursor}` |
 | `GET /v1/tracks?since=<cursor>&limit=50` | `{items:[Track|Tombstone], cursor, has_more}`. since=0(기본)은 살아있는 트랙만, since>0 은 삭제 표시 포함 |
 | `GET /v1/tracks/{id}` | Track / 404 |
@@ -28,6 +29,25 @@ id: `[A-Za-z0-9_-]{8,64}` (클라이언트 UUID 권장). 시각은 모두 epoch 
 { "id": "…", "deleted": true, "updated_at": 1761350000000, "server_seq": 42 }
 ```
 웨이포인트에 `*uri*`, `*url*`, `*path*`, `*image*`, `base64` 같은 필드가 있으면 400. 본문 최대 8MB, points 최대 200000.
+
+### 현재 날씨 `GET /v1/weather/now?lat=..&lon=..`
+- 인증: 위와 같은 길담 액세스 토큰. lat(-90..90)/lon(-180..180) 이 없거나 잘못되면 400, 두 공급원 모두 실패하면 502 `weather_unavailable`.
+- 국내: 위경도 → 기상청 단기예보 격자(nx, ny, LCC DFS) → 초단기실황 `getUltraSrtNcst` 를 요청 때 호출 (미리 수집 안 함). 기준 시각은 KST 정시+40분 이후 그 정시, 그 전이면 이전 정시; 자료 없음이면 한 시간 전.
+- 해외, 기상청 키 없음, 기상청 실패: Open-Meteo current (좌표는 0.05° 격자로 반올림해 보냄).
+- 캐시: 같은 격자 30분 메모리 캐시. 기상청 실패 격자는 5분 동안 바로 Open-Meteo.
+- 위치는 격자 단위로만 쓰고 DB·로그에 남기지 않음.
+- 인증키: 서버 `.env` 의 `KMA_SERVICE_KEY` (없으면 `KMA_API_KEY`). 공공데이터포털 Decoding/Encoding 키 모두 가능.
+
+```jsonc
+{ "source": "KMA",                 // 또는 "OPEN_METEO"
+  "observedAt": "2026-11-15T10:00:00+09:00",
+  "tempC": 3.4, "humidity": 61,
+  "precipType": "NONE",            // NONE / RAIN / SNOW / SLEET (PTY 0→NONE, 1·5→RAIN, 2·6→SLEET, 3·7→SNOW)
+  "precip1hMm": 0,
+  "windSpeedMs": 2.7, "windDirDeg": 315,
+  "windGustMs": null,              // 기상청 실황에는 없음 → null
+  "sky": null }                    // CLEAR / CLOUDY / OVERCAST, 기상청 실황에는 없음 → null
+```
 
 동기화: 앱은 마지막 `cursor` 를 저장하고 `GET /v1/tracks?since=cursor` 를 has_more=false 까지 반복 → 로컬 반영 → 로컬 변경분 PUT/DELETE.
 

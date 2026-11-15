@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createMaps } from "./maps.mjs";
+import { createWeather } from "./weather.mjs";
 import { handlePlacesSearch } from "./places-search.mjs";
 
 const CFG = {
@@ -190,6 +191,10 @@ const server = http.createServer(async (req, res) => {
       const nickname = await nicknameFor(claims, m[1]);
       return send(res, 200, { sub, nickname, display_name: nickname || "누니 회원", brand_id: claims.brand_id ?? null, brand_role: claims.brand_role ?? null, created_at: user.created_at, track_count: c.n, cursor: c.s });
     }
+    if (path === "/v1/weather/now") {
+      if (req.method !== "GET") return send(res, 405, { error: "method_not_allowed" });
+      return weather.handle(req, res, u, send);
+    }
     if (path === "/v1/tracks" && req.method === "GET") {
       const since = Number(u.searchParams.get("since") || 0);
       const limit = Math.min(Math.max(Number(u.searchParams.get("limit") || 50), 1), 200);
@@ -234,6 +239,8 @@ const server = http.createServer(async (req, res) => {
     return send(res, 500, { error: "server_error" });
   }
 });
+const weather = createWeather();
+console.log(`weather: KMA key ${weather.hasKmaKey ? "set" : "missing (Open-Meteo only)"}`);
 const maps = createMaps({ db, tx, send, readBody, verifyJwt, AuthError, issuer: CFG.issuer });
 server.listen(CFG.port, () => console.log(`gildam-api :${CFG.port} base=${CFG.basePath || "/"} aud=${CFG.audience.join(",")}`));
 for (const s of ["SIGTERM", "SIGINT"]) process.on(s, () => server.close(() => { db.close(); process.exit(0); }));
